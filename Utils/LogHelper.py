@@ -71,7 +71,8 @@ class LogHelper(object):
             log_colour, log_attrs = LogColour.__dict__["_member_map_"][level.name].value
             object_name = colored(self.__name, color="blue", attrs=["bold"])
             if len(args):
-                print(object_name, colored(" ".join(args), color=log_colour, attrs=log_attrs))
+                str_args = [str(v) for v in args]
+                print(object_name, colored(" ".join(str_args), color=log_colour, attrs=log_attrs))
                 if len(kwargs):
                     print("".join(["%s%s=%s\n"%("".rjust(len(self.__name)+4), colored(name, color="blue", attrs=["bold"]), colored(repr(value), color="white", attrs=[])) for name, value in kwargs.items()]))
             elif len(kwargs):

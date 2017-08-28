@@ -41,6 +41,7 @@ class TymboxTaskTimePreference(IntEnum):
     start_at        = preferred + 2     # Must start at preference
     end_no_later    = preferred + 3     # Must end before preference
     duration        = preferred + 4     # Minimum duration, start asap
+    fixed           = preferred + 5     # Cannot implicitly move
 
 
 class TymboxEvent(object):

@@ -231,6 +231,9 @@ background-color: rgba(100,120,120,255);
        <bool>true</bool>
       </property>
       <widget class="QWidget" name="tabTasks">
+       <property name="styleSheet">
+        <string notr="true"/>
+       </property>
        <attribute name="title">
         <string>Tasks</string>
        </attribute>
@@ -252,12 +255,15 @@ background-color: rgba(100,120,120,255);
         </property>
         <item row="0" column="0">
          <widget class="QStackedWidget" name="stackedWidget">
+          <property name="styleSheet">
+           <string notr="true">#stackedWidget { background-color: lightblue; }</string>
+          </property>
           <property name="currentIndex">
            <number>0</number>
           </property>
           <widget class="QWidget" name="TabTasks">
            <property name="styleSheet">
-            <string notr="true">#TabTasks { background-color: white; }</string>
+            <string notr="true"/>
            </property>
            <layout class="QVBoxLayout" name="verticalLayout_2">
             <item>
@@ -294,7 +300,7 @@ background-color: rgba(100,120,120,255);
           </widget>
           <widget class="QWidget" name="TabAddTask">
            <property name="styleSheet">
-            <string notr="true">#TabAddTask { background-color: lightblue }</string>
+            <string notr="true"/>
            </property>
            <layout class="QVBoxLayout">
             <item>
@@ -309,7 +315,8 @@ background-color: rgba(100,120,120,255);
                <string/>
               </property>
               <property name="icon">
-               <iconset theme="go-previous"/>
+               <iconset theme="go-previous">
+                <normaloff>.</normaloff>.</iconset>
               </property>
               <property name="flat">
                <bool>true</bool>
