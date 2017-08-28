@@ -24,7 +24,10 @@ class GenericMethodThread(QThread):
         self.start()
 
     def run(self):
-        self.sig_data.emit(self.method(*self.args, **self.kwargs))
+        try:
+            self.sig_data.emit(self.method(*self.args, **self.kwargs))
+        except:
+            self.sig_data.emit(None)
 
 
 # noinspection PyAbstractClass

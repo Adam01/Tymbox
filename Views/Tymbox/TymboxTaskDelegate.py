@@ -177,8 +177,7 @@ class TymboxTaskDelegate(QStyledItemDelegate, LogHelper):
 
         pixels_minute = self.parent().pixels_minute
         minutes_dragged = drag_distance / pixels_minute
-        start_time = index.model().data(index.sibling(index.row(), TymboxModelColumns.start_time),
-                                      Qt.EditRole)
+        start_time = index.model().data(index.sibling(index.row(), TymboxModelColumns.start_time), Qt.EditRole)
         new_start_time = start_time + minutes_dragged*60
         start_time_delta = new_start_time - start_time
         rounded_start_time = math.ceil(new_start_time/60 / 15) * 15*60 if start_time_delta < 0 else math.floor( new_start_time/60 / 15) * 15*60
@@ -195,7 +194,7 @@ class TymboxTaskDelegate(QStyledItemDelegate, LogHelper):
 
         if abs(rounded_start_time_delta) >= 15:
             # Drag in 15 minute increments
-            new_start_time = index.model().alter_event_start_time(index.row(), rounded_start_time - start_time)
+            new_start_time = index.model().alter_event_start_time(index.row(), rounded_start_time_delta)
 
             # Update preferred start to new value (if changed)
             index.model().setData(index.sibling(index.row(), TymboxModelColumns.preference_value), new_start_time)
@@ -207,36 +206,35 @@ class TymboxTaskDelegate(QStyledItemDelegate, LogHelper):
     def handle_duration_drag(self, index: QModelIndex, drag_distance: int):
         pixels_minute = self.parent().pixels_minute
         minutes_dragged = drag_distance / pixels_minute
-        duration = index.model().data(index.sibling(index.row(), TymboxModelColumns.duration),
-                                      Qt.EditRole)
-        new_duration = duration + minutes_dragged
-        duration_delta = new_duration - duration
-        rounded_duration = math.ceil(new_duration / 15) * 15 if duration_delta < 0 else math.floor(
-            new_duration / 15) * 15
-        rounded_duration_delta = rounded_duration - duration
+        duration_m = index.model().get_event(index.row()).duration/60
+        new_duration_m = duration_m + minutes_dragged
+        duration_delta = new_duration_m - duration_m
+        rounded_duration = math.ceil(new_duration_m / 15) * 15 if duration_delta < 0 else math.floor(
+            new_duration_m / 15) * 15
+        rounded_duration_delta = rounded_duration - duration_m
 
         self.log_extra_debug("Duration mouse drag",
                              pixel_distance=drag_distance,
                              minutes_dragged=minutes_dragged,
-                             current_duration=duration,
-                             new_duration=new_duration,
+                             current_duration=duration_m,
+                             new_duration=new_duration_m,
                              duration_delta=duration_delta,
                              rounded_duration=rounded_duration,
                              rounded_duration_delta=rounded_duration_delta)
 
-        if new_duration >=15 and abs(rounded_duration_delta) >= 15:
+        if new_duration_m >=15 and abs(rounded_duration_delta) >= 15:
             # Drag in 15 minute increments
-            index.model().alter_event_duration(index.row(), rounded_duration - duration)
+            index.model().alter_event_duration(index.row(), rounded_duration_delta*60 )
             return True
 
         return False
 
     def sizeHint(self, QStyleOptionViewItem, index: QModelIndex):
-        duration = index.model().data(index.sibling(index.row(), TymboxModelColumns.duration), Qt.EditRole)
-        model_duration = index.model().duration
+        duration_m = index.model().get_event(index).duration*60
+        model_duration_m = index.model().duration*60
         height = self.parent().height()
-        pixels_minute = height/model_duration
-        item_pixels = pixels_minute*duration
+        pixels_minute = height/model_duration_m
+        item_pixels = pixels_minute*duration_m
         return QSize(self.parent().viewport().width(), item_pixels)
 
 

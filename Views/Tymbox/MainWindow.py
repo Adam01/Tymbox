@@ -114,6 +114,34 @@ class MainWindow(QMainWindow):
     def on_task_ended(self, task: TymboxTask):
         QMessageBox.information(self, "Time's up!", "Current task has ended")
 
+    @pyqtSlot(name="on_btnInsertTask_released")
+    def on_show_insert_task(self):
+        self.ui.btnAddTask.setText("Insert")
+        self.ui.stackedWidget.setCurrentIndex(1)
+
+    @pyqtSlot(name="on_btnAppendTask_released")
+    def on_show_append_task(self):
+        self.ui.btnAddTask.setText("Append")
+        self.ui.stackedWidget.setCurrentIndex(1)
+
+    @pyqtSlot(name="on_btnAddTask_released")
+    def on_add_task(self):
+        if self.ui.btnAddTask.text() == "Append":
+            self.tymbox_model.append_task(self.ui.editTaskName.text(),
+                                          self.ui.spinTaskDuration.value()*60)
+        elif self.ui.btnAddTask.text() == "Insert":
+            # TODO
+            self.tymbox_model.append_task(self.ui.editTaskName.text(),
+                                          self.ui.spinTaskDuration.value()*60)
+
+        self.ui.editTaskName.clear()
+        self.ui.spinTaskDuration.setValue(15)
+        self.ui.stackedWidget.setCurrentIndex(0)
+
+    @pyqtSlot(name="on_btnAddTaskBack_released")
+    def on_back_to_tasks(self):
+        self.ui.stackedWidget.setCurrentIndex(0)
+
     @pyqtSlot(name="on_BoardsModel_modelReset")
     def on_board_model_reset(self):
         self.ui.cmb_boards.setEditable(False)

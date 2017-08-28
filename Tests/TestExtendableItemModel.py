@@ -3,7 +3,8 @@ from enum import IntEnum
 
 from PyQt5.QtCore import Qt
 
-from ExtendableItemModel import ExtendableItemModel, ItemModelDataSetType
+from Models.ExtendableItemModel import ExtendableItemModel, ItemModelDataSetType
+from Utils.LogHelper import LogLevel
 
 
 class TestExtendableItemModel(unittest.TestCase):

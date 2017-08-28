@@ -2,9 +2,10 @@ import trello
 from PyQt5.QtCore import QAbstractTableModel, pyqtSlot, QModelIndex, Qt
 
 from Trello.AsyncTrelloClient import AsyncTrelloClient
+from Utils.LogHelper import LogHelper
 
 
-class TrelloBoardsModel(QAbstractTableModel):
+class TrelloBoardsModel(QAbstractTableModel, LogHelper):
     def __init__(self, trello_client: AsyncTrelloClient, parent=None):
         QAbstractTableModel.__init__(self, parent)
         self.trello_client = trello_client
@@ -20,10 +21,13 @@ class TrelloBoardsModel(QAbstractTableModel):
 
     @pyqtSlot(object, name="on_gotBoards")
     def on_got_boards(self, board_list):
-        self.beginResetModel()
-        self.trello_boards = board_list
-        print("Boards fetched. rowCount=%i" % self.rowCount())
-        self.endResetModel()
+        if board_list is not None:
+            self.beginResetModel()
+            self.trello_boards = board_list
+            print("Boards fetched. rowCount=%i" % self.rowCount())
+            self.endResetModel()
+        else:
+            self.log_warning("Unable to fetch trello boards")
 
     def data(self, index: QModelIndex, role=None):
         if not index.isValid() or index.row() > self.rowCount() or index.column() > self.columnCount():

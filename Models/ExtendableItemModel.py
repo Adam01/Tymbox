@@ -181,27 +181,34 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
         if col_def.data_set.type in [ItemModelDataSetType.Obj, ItemModelDataSetType.ObjTree]:
             if not hasattr(data_source, col_def.data_id):
                 raise KeyError("Data ID not in data source object")
-            setattr(data_source, col_def.data_id, value)
+            changed = getattr(data_source, col_def.data_id) != value
+            if changed:
+                setattr(data_source, col_def.data_id, value)
         elif col_def.data_set.type == ItemModelDataSetType.Dict:
             if col_def.data_id not in data_source:
                 raise KeyError("Data ID not in data source object")
-            data_source[col_def.data_id] = value
+            changed = data_source[col_def.data_id] != value
+            if changed:
+                data_source[col_def.data_id] = value
         elif col_def.data_set.type == ItemModelDataSetType.List:
             if col_def.data_id >= len(data_source):
                 raise KeyError("Data ID of data set range")
-            data_source[col_def.data_id] = value
+            changed = data_source[col_def.data_id] != value
+            if changed:
+                data_source[col_def.data_id] = value
         else:
             raise Exception("Unhandled data source type")
 
-        self.log_extra_debug("Set managed data", index=index,
-                                                 data_id=col_def.data_id,
-                                                 column_no=col_def.column_no,
-                                                 column=col_def.display_name,
-                                                 value=value)
+        if changed:
+            self.log_extra_debug("Set managed data", index=index,
+                                                     data_id=col_def.data_id,
+                                                     column_no=col_def.column_no,
+                                                     column=col_def.display_name,
+                                                     value=value)
 
-        self.dataChanged.emit(index, index)
+            self.dataChanged.emit(index, index)
 
-    def data(self, index: QModelIndex, role=None):
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
         if role in [Qt.DisplayRole, Qt.EditRole]:
             return self.get_data_set_column_value(index, role == Qt.DisplayRole)
         return None

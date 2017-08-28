@@ -35,9 +35,9 @@ class TymboxTimeline(QWidget):
 
     def paintEvent(self, paint_event: QPaintEvent):
 
-        duration = self.tymbox_model.duration
+        duration_m = self.tymbox_model.duration/60
 
-        self.setFixedHeight(duration*self.pixels_minute)
+        self.setFixedHeight(duration_m*self.pixels_minute)
         self.setFixedWidth(self.parent().width())
 
         option = QStyleOptionViewItem()
@@ -79,10 +79,10 @@ class TymboxTimeline(QWidget):
 
     def get_task_height(self, row):
         event = self.tymbox_model.get_event(row)
-        duration = event.duration
+        duration_m = event.duration/60
         start_time = event.start_time
         model_start_time = self.tymbox_model.start_time
-        item_height_pixels = self.pixels_minute * duration
+        item_height_pixels = self.pixels_minute * duration_m
         item_y_pixels = self.pixels_minute * (start_time - model_start_time)/60
         return QRect(0, item_y_pixels, 0, item_height_pixels)
 

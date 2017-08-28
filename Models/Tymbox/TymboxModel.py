@@ -47,21 +47,21 @@ class TymboxEvent(object):
     type = "Event"
 
     def __init__(self):
-        self.duration = 60
+        self.end_time = 60
         self.name = ""
         self.start_time = 0
         self.preference_value = 0
         self.time_preference = TymboxTaskTimePreference.preferred
 
     @property
-    def end_time(self) -> int:
-        return self.start_time + self.duration*60
+    def duration(self) -> int:
+        return self.end_time - self.start_time
 
     @classmethod
     def deserialise(cls, data):
         instance = cls()
         instance.name = data["name"]
-        instance.duration = data["duration"]
+        instance.end_time = data["duration"]
         return instance
 
     def serialise(self) -> dict():
@@ -102,16 +102,15 @@ class TymboxModelColumns(IntEnum):
     type                = name + 1
     start_time          = name + 2
     end_time            = name + 3
-    duration            = name + 4
-    preference_value    = name + 5
-    time_preference     = name + 6
+    preference_value    = name + 4
+    time_preference     = name + 5
 
 TymboxModelColumnsCount = len(list(TymboxModelColumns))
 
 class TymboxModel(ExtendableItemModel):
     def __init__(self, parent=None):
         ExtendableItemModel.__init__(self, parent)
-        self.duration = 540
+        self.duration = 8*60*60
         self.start_time = datetime.datetime.today().replace(hour=12, minute=0, second=0, microsecond=0).timestamp()
         self.tasks = []
         self.cards_model = None
@@ -123,7 +122,6 @@ class TymboxModel(ExtendableItemModel):
 
         self.set_column_formatter(TymboxModelColumns.start_time, self._time_formatter )
         self.set_column_formatter(TymboxModelColumns.end_time, self._time_formatter )
-        self.set_column_formatter(TymboxModelColumns.duration, self._duration_formatter )
         self.set_column_formatter(TymboxModelColumns.preference_value, self._time_formatter )
 
     @staticmethod
@@ -164,10 +162,19 @@ class TymboxModel(ExtendableItemModel):
 
         return default_flags
 
-    def insert_task(self, at, task: TymboxEvent):
+    def __insert_task(self, at, task: TymboxEvent):
         self.next_task_to_insert = task
         self.insertRow(at)
         self.next_task_to_insert = None
+
+    def append_task(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
+        task = TymboxTask()
+        task.name = name
+        task.start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
+        task.end_time = task.start_time + duration
+        task.time_preference = time_preference
+        task.preference_value = task.start_time if preference_value is None else preference_value
+        self.__insert_task(len(self.tasks), task)
 
     def remove_task(self, at):
         self.removeRow(at)
@@ -293,8 +300,7 @@ class TymboxModel(ExtendableItemModel):
             task.start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
             task.preference_value = task.start_time
 
-            row = len(self.tasks)
-            self.insert_task(row, task)
+            self.__insert_task(len(self.tasks), task)
         else:
             task.start_time = self.tasks[row].start_time
             task.preference_value = self.tasks[row].start_time

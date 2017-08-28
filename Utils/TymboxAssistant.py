@@ -45,7 +45,7 @@ class TymboxAssistant(QObject, LogHelper):
     @pyqtSlot(QModelIndex, QModelIndex)
     def on_model_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles=None):
         if top_left.column() <= TymboxModelColumns.start_time <= bottom_right.column() \
-                or top_left.column() <= TymboxModelColumns.duration <= bottom_right.column():
+                or top_left.column() <= TymboxModelColumns.end_time <= bottom_right.column():
             self.log_extra_debug("Handling modified rows: ", top=top_left.row(), bottom=bottom_right.row())
             self.__scan_rows(top_left.row(), bottom_right.row())
 
