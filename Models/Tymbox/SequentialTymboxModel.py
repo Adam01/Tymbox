@@ -25,8 +25,8 @@ class SequentialTymboxModel(TymboxModel):
         self.timing_data = []
 
         self.dataChanged.connect(self.on_dataChanged)
-        self.rowsInserted.connect(self.on_rowInserted, Qt.QueuedConnection)
-        self.rowsRemoved.connect(self.on_rowRemoved, Qt.QueuedConnection)
+        self.rowsInserted.connect(self.on_rowInserted)
+        self.rowsRemoved.connect(self.on_rowRemoved)
 
         # Figure this design flaw out later
         # Goal is to have the object name for the model set before it logs column additions
@@ -262,12 +262,13 @@ class SequentialTymboxModel(TymboxModel):
 
     @pyqtSlot(QModelIndex, int, int)
     def on_rowRemoved(self, parent: QModelIndex, first: int, last: int):
-        for i in range(first, -1, -1):
-            self.timing_data[i].latest_end = self.calculate_latest_end(i)
-            print("Calculated timing data for row", i, "earliest start:", self.timing_data[i].earliest_start,
-                  "latest end:", self.timing_data[i].latest_end)
+        if self.rowCount() > 0:
+            for i in range(first, -1, -1):
+                self.timing_data[i].latest_end = self.calculate_latest_end(i)
+                print("Calculated timing data for row", i, "earliest start:", self.timing_data[i].earliest_start,
+                      "latest end:", self.timing_data[i].latest_end)
 
-        for i in range(last, self.rowCount()):
-            self.timing_data[i].earliest_start = self.calculate_earliest_start(i)
-            print("Calculated timing data for row", i, "earliest start:", self.timing_data[i].earliest_start,
-                  "latest end:", self.timing_data[i].latest_end)
+            for i in range(last, self.rowCount()):
+                self.timing_data[i].earliest_start = self.calculate_earliest_start(i)
+                print("Calculated timing data for row", i, "earliest start:", self.timing_data[i].earliest_start,
+                      "latest end:", self.timing_data[i].latest_end)

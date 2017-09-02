@@ -128,6 +128,9 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
     def index(self, row: int, column: int, parent=None, *args, **kwargs):
         if 0 <= row < self.rowCount(parent) and 0 <= column < self.columnCount(parent):
             return self.createIndex(row, column, None)
+        else:
+            self.log_warning("Invalid index requested")
+            return QModelIndex()
 
     @staticmethod
     def validate_index(index: QModelIndex) -> None:

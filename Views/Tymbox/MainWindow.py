@@ -10,7 +10,6 @@ from Utils.TymboxAssistant import TymboxAssistant
 from Views.Trello.TrelloCardItemDelegate import TrelloCardItemDelegate
 from Models.Trello.TrelloCardsModel import TrelloCardsModel
 from Models.Trello.TrelloListsModel import TrelloListsModel
-from Views.Tymbox.TymboxTaskDelegate import TymboxTaskDelegate
 from Views.Tymbox.TymboxTimeline import TymboxTimeline
 from Views.Generated.TymBox import Ui_MainWindow
 from Views.Generated.DebugTableView import Ui_DebugTableWindow
@@ -33,7 +32,7 @@ class MainWindow(QMainWindow):
         self.tymbox_model = SequentialTymboxModel()
         self.tymbox_model.setObjectName("TymboxModel")
         self.tymbox_model.set_cards_model(self.cards_model)
-        self.tymbox_model.set_log_level(LogLevel.Debug)
+        self.tymbox_model.set_log_level(LogLevel.ExtraDebug)
 
         self.tymbox_assistant = TymboxAssistant(self, self.tymbox_model)
         self.tymbox_assistant.setObjectName("TymboxAssistant")
@@ -81,10 +80,7 @@ class MainWindow(QMainWindow):
         self.ui.list_trello_cards.setModel(self.cards_model)
         self.ui.list_trello_cards.setItemDelegate(TrelloCardItemDelegate(self.ui.list_trello_cards))
 
-        self.tymbox_timeline = TymboxTimeline(self.tymbox_model)
-        delegate = TymboxTaskDelegate(self.tymbox_timeline)
-        delegate.set_log_level(LogLevel.Debug)
-        self.tymbox_timeline.setDelegate(delegate)
+        self.tymbox_timeline = TymboxTimeline(self, self.tymbox_model)
         self.ui.tymbox_view.setWidget(self.tymbox_timeline)
 
         self.tymbox_timeline.setAcceptDrops(True)
