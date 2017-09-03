@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
         self.ui.list_trello_cards.setModel(self.cards_model)
         self.ui.list_trello_cards.setItemDelegate(TrelloCardItemDelegate(self.ui.list_trello_cards))
 
-        self.tymbox_timeline = TymboxTimeline(self, self.tymbox_model)
+        self.tymbox_timeline = TymboxTimeline(self.tymbox_timeline, self.tymbox_model)
         self.ui.tymbox_view.setWidget(self.tymbox_timeline)
 
         self.tymbox_timeline.setAcceptDrops(True)

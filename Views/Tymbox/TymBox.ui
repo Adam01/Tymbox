@@ -196,7 +196,7 @@ background-color: rgba(100,120,120,255);
        <enum>Qt::ScrollBarAlwaysOff</enum>
       </property>
       <property name="widgetResizable">
-       <bool>false</bool>
+       <bool>true</bool>
       </property>
       <property name="alignment">
        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
@@ -206,7 +206,7 @@ background-color: rgba(100,120,120,255);
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>294</width>
+         <width>309</width>
          <height>558</height>
         </rect>
        </property>
@@ -219,7 +219,7 @@ background-color: rgba(100,120,120,255);
        <enum>QTabWidget::North</enum>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <property name="usesScrollButtons">
        <bool>true</bool>

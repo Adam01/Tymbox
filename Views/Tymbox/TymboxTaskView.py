@@ -3,6 +3,7 @@ from PyQt5.QtCore import QModelIndex, QPersistentModelIndex, pyqtSlot, Qt, QRect
 from PyQt5.QtGui import QCursor, QMouseEvent
 from PyQt5.QtWidgets import QWidget, QDataWidgetMapper, QApplication
 
+from Models.Tymbox.SequentialTymboxModel import SequentialTymboxModel
 from Models.Tymbox.TymboxModel import TymboxModelColumns
 from Utils.LogHelper import LogHelper, LogLevel
 from Views.Generated.TymBoxTaskView import Ui_TymboxTaskView
@@ -82,11 +83,10 @@ class TymboxTaskView(QWidget, LogHelper):
         LogHelper.__init__(self)
         self.ui = Ui_TymboxTaskView()
         self.setup_ui()
+        self.model = index.model() # type: SequentialTymboxModel
 
-        self.persistent_index = QPersistentModelIndex(index)
-
-        index.model().rowsAboutToBeRemoved.connect(self.on_rows_about_to_be_removed)
-        index.model().dataChanged.connect(self.on_dataChanged)
+        self.model.rowsAboutToBeRemoved.connect(self.on_rows_about_to_be_removed)
+        self.model.dataChanged.connect(self.on_dataChanged)
 
 
         def start_hot_spot(rect_pos: QRect):
@@ -112,29 +112,28 @@ class TymboxTaskView(QWidget, LogHelper):
                 child.installEventFilter(self)
                 child.setMouseTracking(True)
 
-        self.reposition()
-        self.show()
+
 
         self.data_mapper = QDataWidgetMapper(self)
-        self.data_mapper.setModel(index.model())
+        self.data_mapper.setModel(self.model)
 
         self.data_mapper.addMapping(self.ui.lineEdit, TymboxModelColumns.name)
 
         self.data_mapper.setCurrentIndex(index.row())
 
-
-
+        self.reposition()
+        self.show()
 
     def setup_ui(self):
         self.ui.setupUi(self)
 
-    def get_rect_rel_to_parent(self):
+    def get_rect_rel_to_parent(self) -> QRect:
         rect = self.rect()
         pos = self.pos()
         rect = rect.adjusted(pos.x(), pos.y(), pos.x(), pos.y())
         return rect
 
-    def eventFilter(self, obj, event):
+    def eventFilter(self, obj, event) -> bool:
         if event.type() == QEvent.MouseMove:
             this_rect = self.get_rect_rel_to_parent()
             self.start_timer_drag_helper.check_dragging(this_rect, event)
@@ -142,30 +141,39 @@ class TymboxTaskView(QWidget, LogHelper):
         return QWidget.eventFilter(self, obj, event)
 
     def reposition(self):
-        rect = self.get_task_height()
-        self.move(80, 10 + rect.y())
-        self.resize(self.parent().width() - 90, rect.height())
+        event = self.model.get_event(self.data_mapper.currentIndex())
 
-    def get_task_height(self):
-        vertical_margin = 1
-        model = self.persistent_index.model()
-        event = model.get_event(self.persistent_index.row())
-        duration_m = event.duration/60
+        from Views.Tymbox.TymboxTimeline import TymboxTimeline
+        timeline = self.parent() # type: TymboxTimeline
+
+        top_margin = timeline.item_spacing/2 if self.data_mapper.currentIndex() != 0 else 0
+        bottom_margin = timeline.item_spacing/2 if self.data_mapper.currentIndex()+1 < self.model.rowCount() else 0
+
+        duration_m = event.duration / 60
         start_time = event.start_time
-        model_start_time = model.start_time
-        item_height_pixels = self.parent().pixels_minute * duration_m
-        item_y_pixels = self.parent().pixels_minute * (start_time - model_start_time)/60
-        return QRect(0, item_y_pixels + vertical_margin, 0, item_height_pixels - vertical_margin)
+        model_start_time = self.model.start_time
+        item_height_pixels = timeline.pixels_minute * duration_m
+        item_y_pixels = timeline.pixels_minute * (start_time - model_start_time) / 60
+        x_pos = timeline.padding.left
+        y_pos = timeline.padding.top + item_y_pixels + top_margin
+        width = timeline.width() - timeline.padding.left - timeline.padding.right
+        height = item_height_pixels - bottom_margin
+
+        self.move(x_pos, y_pos)
+        self.resize(width, height)
+
+        self.log_debug("Repositioned", x=x_pos, y=y_pos, width=width, height=height)
+
 
     @pyqtSlot(QModelIndex, int, int)
     def on_rows_about_to_be_removed(self, index: QModelIndex, first: int, last: int):
-        if first <= self.persistent_index.row() <= last:
+        if first <= self.data_mapper.currentIndex() <= last:
             self.log_debug("Row removed from model, deleting...")
             self.deleteLater()
 
     @pyqtSlot(QModelIndex, QModelIndex)
     def on_dataChanged(self, top_left: QModelIndex, bottom_right: QModelIndex, roles=None):
-        if top_left.row() <= self.persistent_index.row() <= bottom_right.row():
+        if top_left.row() <= self.data_mapper.currentIndex() <= bottom_right.row():
             if top_left.column() <= TymboxModelColumns.start_time <= bottom_right.column():
                 self.reposition()
             if top_left.column() <= TymboxModelColumns.end_time <= bottom_right.column():
@@ -175,17 +183,17 @@ class TymboxTaskView(QWidget, LogHelper):
     @pyqtSlot(name="on_btnRemove_released")
     def removeTask(self):
         self.log_debug("Remove requested")
-        self.data_mapper.model().removeRow(self.data_mapper.currentIndex())
+        self.model.removeRow(self.data_mapper.currentIndex())
 
-    def handle_start_time_drag(self, drag_distance: int):
+    def handle_start_time_drag(self, drag_distance: int) -> bool:
 
         pixels_minute = self.parent().pixels_minute
         minutes_dragged = drag_distance / pixels_minute
-        start_time = self.data_mapper.model().index(self.data_mapper.currentIndex(), TymboxModelColumns.start_time).data(Qt.EditRole)
+        start_time = self.model.get_event(self.data_mapper.currentIndex()).start_time
         new_start_time = start_time + minutes_dragged*60
         start_time_delta = new_start_time - start_time
         rounded_start_time = math.ceil(new_start_time/60 / 15) * 15*60 if start_time_delta < 0 else math.floor( new_start_time/60 / 15) * 15*60
-        rounded_start_time_delta = rounded_start_time - start_time
+        rounded_start_time_delta = int( rounded_start_time - start_time )
 
         self.log_extra_debug("Start time mouse drag",
                              pixel_distance=drag_distance,
@@ -198,19 +206,19 @@ class TymboxTaskView(QWidget, LogHelper):
 
         if abs(rounded_start_time_delta) >= 15:
             # Drag in 15 minute increments
-            new_start_time = self.data_mapper.model().alter_event_start_time(self.data_mapper.currentIndex(), rounded_start_time_delta)
+            new_start_time = self.model.alter_event_start_time(self.data_mapper.currentIndex(), rounded_start_time_delta)
 
             # Update preferred start to new value (if changed)
-            self.data_mapper.model().setData(self.persistent_index.sibling(self.data_mapper.currentIndex(), TymboxModelColumns.preference_value), new_start_time)
+            self.model.setData(self.model.index(self.data_mapper.currentIndex(), TymboxModelColumns.preference_value), new_start_time)
             return True
 
         return False
 
 
-    def handle_duration_drag(self, drag_distance: int):
+    def handle_duration_drag(self, drag_distance: int) -> bool:
         pixels_minute = self.parent().pixels_minute
         minutes_dragged = drag_distance / pixels_minute
-        duration_m = self.data_mapper.model().get_event(self.data_mapper.currentIndex()).duration/60
+        duration_m = self.model.get_event(self.data_mapper.currentIndex()).duration/60
         new_duration_m = duration_m + minutes_dragged
         duration_delta = new_duration_m - duration_m
         rounded_duration = math.ceil(new_duration_m / 15) * 15 if duration_delta < 0 else math.floor(
@@ -228,7 +236,7 @@ class TymboxTaskView(QWidget, LogHelper):
 
         if new_duration_m >=15 and abs(rounded_duration_delta) >= 15:
             # Drag in 15 minute increments
-            self.data_mapper.model().alter_event_duration(self.data_mapper.currentIndex(), rounded_duration_delta*60 )
+            self.model.alter_event_duration(self.data_mapper.currentIndex(), rounded_duration_delta*60 )
             return True
 
         return False

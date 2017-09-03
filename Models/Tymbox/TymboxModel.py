@@ -3,7 +3,7 @@ import json
 from enum import IntEnum, unique
 
 import math
-from PyQt5.QtCore import QModelIndex, Qt, QMimeData, QTextStream, QByteArray, QDataStream, QIODevice
+from PyQt5.QtCore import QModelIndex, Qt, QMimeData, QTextStream, QByteArray, QDataStream, QIODevice, pyqtSignal
 
 from Models.ExtendableItemModel import ExtendableItemModel, ItemModelDataSetType, ItemModelDataSet
 from Models.Trello.TrelloCardsModel import TrelloCardsModel
@@ -109,6 +109,9 @@ class TymboxModelColumns(IntEnum):
 TymboxModelColumnsCount = len(list(TymboxModelColumns))
 
 class TymboxModel(ExtendableItemModel):
+
+    durationChanged = pyqtSignal(int)
+
     def __init__(self, parent=None):
         ExtendableItemModel.__init__(self, parent)
         self.duration = 8*60*60
@@ -140,6 +143,7 @@ class TymboxModel(ExtendableItemModel):
 
     def set_duration(self, duration: int):
         self.duration = duration
+        self.durationChanged.emit(duration)
 
     def set_cards_model(self, model: TrelloCardsModel):
         self.cards_model = model
@@ -180,7 +184,7 @@ class TymboxModel(ExtendableItemModel):
     def remove_task(self, at):
         self.removeRow(at)
 
-    def construct_data_source(self, data_set: ItemModelDataSet, pos: int):
+    def construct_data_source(self, data_set: ItemModelDataSet, pos: int) -> object:
         if data_set.id == "TymboxModelDS":
             if self.next_task_to_insert is None:
                 print("construct called for task")

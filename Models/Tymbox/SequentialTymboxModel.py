@@ -5,7 +5,8 @@ from PyQt5.QtCore import QModelIndex, pyqtSlot
 from PyQt5.QtCore import Qt
 
 from Models.ExtendableItemModel import ItemModelDataSetType, ItemModelDataSet
-from Models.Tymbox.TymboxModel import TymboxModel, TymboxModelColumnsCount, TymboxModelColumns, TymboxTaskTimePreference
+from Models.Tymbox.TymboxModel import TymboxModel, TymboxModelColumnsCount, TymboxModelColumns, \
+    TymboxTaskTimePreference, TymboxEvent
 
 
 class SequentialTiming(object):
@@ -42,7 +43,7 @@ class SequentialTymboxModel(TymboxModel):
         self.set_column_formatter(SequentialTymboxModelColumns.latest_end, self._time_formatter)
 
     # Pre-calculations
-    def calculate_earliest_start(self, pos):
+    def calculate_earliest_start(self, pos) -> int:
         if pos > 0:
             previous_task = self.tasks[pos-1]
             if previous_task.time_preference in [TymboxTaskTimePreference.preferred, TymboxTaskTimePreference.sequential]:
@@ -61,7 +62,7 @@ class SequentialTymboxModel(TymboxModel):
         else:
             return self.start_time
 
-    def calculate_latest_end(self, pos):
+    def calculate_latest_end(self, pos) -> int:
         if pos+1 < self.rowCount():
             event = self.get_event(pos+1)
             if event.time_preference == TymboxTaskTimePreference.preferred:
@@ -72,7 +73,7 @@ class SequentialTymboxModel(TymboxModel):
             return self.start_time + ( self.duration*60 )
 
     # Aligning the model
-    def get_next_overlapping_event(self, row):
+    def get_next_overlapping_event(self, row) -> (TymboxEvent, SequentialTiming):
         if row+1 < len(self.tasks):
             event = self.get_event(row)
             next_event = self.get_event(row+1)
@@ -80,7 +81,7 @@ class SequentialTymboxModel(TymboxModel):
                 return next_event, self.timing_data[row+1]
         return None, None
 
-    def get_previous_overlapping_event(self, row):
+    def get_previous_overlapping_event(self, row: int) -> (TymboxEvent, SequentialTiming):
         if row > 0:
             event = self.get_event(row)
             previous_event = self.get_event(row-1)
@@ -88,7 +89,7 @@ class SequentialTymboxModel(TymboxModel):
                 return previous_event, self.timing_data[row-1]
         return None, None
 
-    def alter_event_start_time(self, row, amount_s):
+    def alter_event_start_time(self, row: int, amount_s: int) -> int:
         event = self.get_event(row)
 
         if amount_s < 0:
@@ -145,7 +146,7 @@ class SequentialTymboxModel(TymboxModel):
 
         self.alter_event_start_time(row, distance_to_preferred)
 
-    def construct_data_source(self, data_set: ItemModelDataSet, pos: int):
+    def construct_data_source(self, data_set: ItemModelDataSet, pos: int) -> object:
         if data_set.id == "SequentialModelDS":
             self.log_debug("Constructing sequential timing data source")
             return SequentialTiming()

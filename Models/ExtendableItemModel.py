@@ -240,7 +240,7 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
             return len(self.column_definitions[0].data_set)
         return 0
 
-    def construct_data_source(self, data_set: ItemModelDataSet, pos: int):
+    def construct_data_source(self, data_set: ItemModelDataSet, pos: int) -> object:
         if data_set.type == ItemModelDataSetType.List:
             return [None]*self.columnCount()
         elif data_set.type in [ItemModelDataSetType.Obj, ItemModelDataSetType.ObjTree]:
