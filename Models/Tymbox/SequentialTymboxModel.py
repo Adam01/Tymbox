@@ -70,7 +70,7 @@ class SequentialTymboxModel(TymboxModel):
             else:
                 return self.tasks[pos+1].start_time
         else:
-            return self.start_time + ( self.duration*60 )
+            return self.start_time + self.duration
 
     # Aligning the model
     def get_next_overlapping_event(self, row) -> (TymboxEvent, SequentialTiming):
@@ -99,13 +99,16 @@ class SequentialTymboxModel(TymboxModel):
             if (event.end_time + amount_s) > self.timing_data[row].latest_end:
                 amount_s = self.timing_data[row].latest_end - event.end_time
 
-        new_start_time = event.start_time + amount_s
-        new_end_time = event.end_time + amount_s
+        if amount_s != 0:
+            new_start_time = event.start_time + amount_s
+            new_end_time = event.end_time + amount_s
 
-        self.setData(self.index(row, TymboxModelColumns.end_time), new_end_time, Qt.EditRole)
-        self.setData(self.index(row, TymboxModelColumns.start_time), new_start_time, Qt.EditRole)
+            self.setData(self.index(row, TymboxModelColumns.end_time), new_end_time, Qt.EditRole)
+            self.setData(self.index(row, TymboxModelColumns.start_time), new_start_time, Qt.EditRole)
 
-        return new_start_time
+            return new_start_time
+
+        return event.start_time
 
     def alter_event_duration(self, row, amount_s):
         event = self.get_event(row)
@@ -114,7 +117,8 @@ class SequentialTymboxModel(TymboxModel):
         if new_end_time > self.timing_data[row].latest_end:
             new_end_time = self.timing_data[row].latest_end
 
-        self.setData(self.index(row, TymboxModelColumns.end_time), new_end_time)
+        if event.end_time != new_end_time:
+            self.setData(self.index(row, TymboxModelColumns.end_time), new_end_time)
 
     def bring_to_preferred_start(self, row):
         """ Moves a task towards its preferred start time """
@@ -125,14 +129,14 @@ class SequentialTymboxModel(TymboxModel):
 
         if distance_to_preferred < 0:
             previous_event = self.get_event(row - 1) if row > 0 else None
-            earliest_start = previous_event.end_time if previous_event is not None else self.start_time
-            max_distance = earliest_start - event.start_time
+            next_start = previous_event.end_time if previous_event is not None else self.start_time
+            max_distance = next_start - event.start_time
             if distance_to_preferred < max_distance:
                 distance_to_preferred = max_distance
         else:
             next_event = self.get_event(row + 1) if row + 1 < self.rowCount() else None
-            latest_end = next_event.start_time if next_event is not None else self.start_time + self.duration
-            max_distance = latest_end - event.end_time
+            next_end = next_event.start_time if next_event is not None else self.start_time + self.duration
+            max_distance = next_end - event.end_time
             if distance_to_preferred > max_distance:
                 distance_to_preferred = max_distance
 
@@ -144,7 +148,8 @@ class SequentialTymboxModel(TymboxModel):
                        distance_to_preferred = distance_to_preferred,
                        max_distance=max_distance)
 
-        self.alter_event_start_time(row, distance_to_preferred)
+        if distance_to_preferred != 0:
+            self.alter_event_start_time(row, distance_to_preferred)
 
     def construct_data_source(self, data_set: ItemModelDataSet, pos: int) -> object:
         if data_set.id == "SequentialModelDS":
@@ -163,7 +168,22 @@ class SequentialTymboxModel(TymboxModel):
                            row=row + 1,
                            earliest_start=self.timing_data[row + 1].earliest_start)
 
+            previous_end_time = self.get_previous_value(self.index(row, TymboxModelColumns.end_time))
             event = self.get_event(row)
+
+            if previous_end_time is not None and event.end_time <= previous_end_time:
+                # There could be space between this task and the next
+                # Try bring the next task to it's preferred times
+                next_event = self.get_event(row + 1)
+                if next_event.time_preference == TymboxTaskTimePreference.preferred:
+                    if next_event.start_time > next_event.preference_value:
+                        self.bring_to_preferred_start(row + 1)
+                return
+
+            self.log_debug("End time increased, checking for overlap",
+                           end_time=event.end_time,
+                           previous_end_time=previous_end_time)
+
             overlapping_event, overlapping_timing_data = self.get_next_overlapping_event(row)
 
             # If the task has extended it could be overlapping the next task
@@ -172,14 +192,6 @@ class SequentialTymboxModel(TymboxModel):
                       event.end_time - overlapping_event.start_time)
                 # TODO next task preferred times
                 self.alter_event_start_time(row + 1, event.end_time - overlapping_event.start_time)
-
-            # There could be space between this task and the next
-            # Try bring the next task to it's preferred times
-            else:
-                next_event = self.get_event(row + 1)
-                if next_event.time_preference == TymboxTaskTimePreference.preferred:
-                    if next_event.start_time > next_event.preference_value:
-                        self.bring_to_preferred_start(row + 1)
 
     def __start_time_changed(self, row):
         if row > 0:
@@ -191,7 +203,22 @@ class SequentialTymboxModel(TymboxModel):
                            row=row - 1,
                            latest_end=self.timing_data[row - 1].latest_end)
 
+            previous_start_time = self.get_previous_value(self.index(row, TymboxModelColumns.start_time))
             event = self.get_event(row)
+
+            if previous_start_time is not None and event.start_time >= previous_start_time:
+                # There could be space between this task and the previous
+                # Try bring the previous task to it's preferred times
+                previous_event = self.get_event(row - 1)
+                if previous_event.time_preference == TymboxTaskTimePreference.preferred:
+                    if previous_event.start_time < previous_event.preference_value:
+                        self.bring_to_preferred_start(row - 1)
+                return
+
+            self.log_debug("Start time decreased, checking for overlap",
+                           start_time=event.start_time,
+                           previous_start_time=previous_start_time)
+
             overlapping_event, overlapping_timing_data = self.get_previous_overlapping_event(row)
 
             # If the task has been moved ahead it could be overlapping the previous task
@@ -221,28 +248,20 @@ class SequentialTymboxModel(TymboxModel):
                 elif overlapping_event.time_preference == TymboxTaskTimePreference.fixed:
                     raise ValueError("Irrecoverable overlapping event")
 
-            # There could be space between this task and the previous
-            # Try bring the previous task to it's preferred times
-            else:
-                previous_event = self.get_event(row - 1)
-                if previous_event.time_preference == TymboxTaskTimePreference.preferred:
-                    self.bring_to_preferred_start(row - 1)
-                elif previous_event.time_preference == TymboxTaskTimePreference.duration:
-                    # TODO bring to preferred duration
-                    pass
 
-    @pyqtSlot(QModelIndex, QModelIndex)
+    #@pyqtSlot(QModelIndex, QModelIndex)
     def on_dataChanged(self, top_left: QModelIndex, bottom_right: QModelIndex, roles = None):
         """ Ensures sequential order
             Recalculates earliest/latest times
             Moves surrounding events towards their preferred times"""
 
-        for row in range(top_left.row(), bottom_right.row()+1):
-            for column in range(top_left.column(), bottom_right.column()+1):
-                if column == TymboxModelColumns.end_time:
-                    self.__end_time_changed(row)
-                elif column == TymboxModelColumns.start_time:
-                    self.__start_time_changed(row)
+        if roles is None or Qt.EditRole in roles:
+            for row in range(top_left.row(), bottom_right.row()+1):
+                for column in range(top_left.column(), bottom_right.column()+1):
+                    if column == TymboxModelColumns.end_time:
+                        self.__end_time_changed(row)
+                    elif column == TymboxModelColumns.start_time:
+                        self.__start_time_changed(row)
 
     @pyqtSlot(QModelIndex, int, int)
     def on_rowInserted(self, parent: QModelIndex, first: int, last: int):
@@ -264,9 +283,9 @@ class SequentialTymboxModel(TymboxModel):
     @pyqtSlot(QModelIndex, int, int)
     def on_rowRemoved(self, parent: QModelIndex, first: int, last: int):
         if self.rowCount() > 0:
-            for i in range(first, -1, -1):
+            for i in range(first-1, -1, -1):
                 self.timing_data[i].latest_end = self.calculate_latest_end(i)
-                print("Calculated timing data for row", i, "earliest start:", self.timing_data[i].earliest_start,
+                print("Calculated timing data for row", i, "latest start:", self.timing_data[i].earliest_start,
                       "latest end:", self.timing_data[i].latest_end)
 
             for i in range(last, self.rowCount()):

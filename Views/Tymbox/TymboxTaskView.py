@@ -81,6 +81,7 @@ class TymboxTaskView(QWidget, LogHelper):
     def __init__(self, parent, index: QModelIndex):
         QWidget.__init__(self, parent)
         LogHelper.__init__(self)
+        self.set_log_level(LogLevel.Debug)
         self.ui = Ui_TymboxTaskView()
         self.setup_ui()
         self.model = index.model() # type: SequentialTymboxModel
@@ -121,6 +122,8 @@ class TymboxTaskView(QWidget, LogHelper):
 
         self.data_mapper.setCurrentIndex(index.row())
 
+        self.update_logging_name(self.model.get_event(self.data_mapper.currentIndex()).name)
+
         self.reposition()
         self.show()
 
@@ -139,6 +142,9 @@ class TymboxTaskView(QWidget, LogHelper):
             self.start_timer_drag_helper.check_dragging(this_rect, event)
             self.duration_drag_helper.check_dragging(this_rect, event)
         return QWidget.eventFilter(self, obj, event)
+
+    def update_logging_name(self, event_name):
+        self.set_log_name("TymboxTaskView(%s)" % event_name)
 
     def reposition(self):
         event = self.model.get_event(self.data_mapper.currentIndex())
@@ -171,14 +177,16 @@ class TymboxTaskView(QWidget, LogHelper):
             self.log_debug("Row removed from model, deleting...")
             self.deleteLater()
 
-    @pyqtSlot(QModelIndex, QModelIndex)
     def on_dataChanged(self, top_left: QModelIndex, bottom_right: QModelIndex, roles=None):
-        if top_left.row() <= self.data_mapper.currentIndex() <= bottom_right.row():
-            if top_left.column() <= TymboxModelColumns.start_time <= bottom_right.column():
-                self.reposition()
-            if top_left.column() <= TymboxModelColumns.end_time <= bottom_right.column():
-                self.reposition()
+        if roles is None or Qt.EditRole in roles:
+            if top_left.row() <= self.data_mapper.currentIndex() <= bottom_right.row():
+                if top_left.column() <= TymboxModelColumns.name <= bottom_right.column():
+                    self.update_logging_name(self.model.get_event(self.data_mapper.currentIndex()).name)
 
+                if top_left.column() <= TymboxModelColumns.start_time <= bottom_right.column():
+                    self.reposition()
+                elif top_left.column() <= TymboxModelColumns.end_time <= bottom_right.column():
+                    self.reposition()
 
     @pyqtSlot(name="on_btnRemove_released")
     def removeTask(self):

@@ -51,6 +51,9 @@ class ItemModelDataSet:
     def __repr__(self):
         return "ItemModelDataSet(%s %s %s Data: %s)"  % (self.id, self.type, "Managed" if self.managed else "", hex(id(self.src)))
 
+class ItemModelRoles(IntEnum):
+    PreviousValue = Qt.UserRole
+
 class ExtendableItemModel(QAbstractItemModel, LogHelper):
     """
         Item model that supports adding dynamic columns functionally, manages derived data by construct/adding to managed
@@ -62,6 +65,21 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
         self.column_definitions = dict()
         self.data_sets = list()
         self.log_extra_debug("Initialised")
+        self.previous_values = dict()
+
+    def __reset_previous_values_for_row(self, row):
+        self.previous_values[row] = dict()
+
+    def set_previous_value(self, index: QModelIndex, value):
+        self.previous_values[index.row()][index.column()] = value
+        self.dataChanged.emit(index, index, [ItemModelRoles.PreviousValue])
+
+    def get_previous_value(self, index: QModelIndex):
+        return self.previous_values.get(index.row(), dict()).get(index.column())
+
+    def remove_previous_value(self, index: QModelIndex):
+        self.previous_values.get(index.row(), dict()).pop(index.column())
+
 
     def add_data_set(self, str_id: str, data_set: list, ds_type: ItemModelDataSetType=ItemModelDataSetType.Obj, managed: bool=False):
         """
@@ -184,42 +202,51 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
         if col_def.data_set.type in [ItemModelDataSetType.Obj, ItemModelDataSetType.ObjTree]:
             if not hasattr(data_source, col_def.data_id):
                 raise KeyError("Data ID not in data source object")
-            changed = getattr(data_source, col_def.data_id) != value
+            previous_value = getattr(data_source, col_def.data_id)
+            changed = previous_value != value
             if changed:
                 setattr(data_source, col_def.data_id, value)
         elif col_def.data_set.type == ItemModelDataSetType.Dict:
             if col_def.data_id not in data_source:
                 raise KeyError("Data ID not in data source object")
-            changed = data_source[col_def.data_id] != value
+            previous_value = data_source[col_def.data_id]
+            changed = previous_value != value
             if changed:
                 data_source[col_def.data_id] = value
         elif col_def.data_set.type == ItemModelDataSetType.List:
             if col_def.data_id >= len(data_source):
                 raise KeyError("Data ID of data set range")
-            changed = data_source[col_def.data_id] != value
+            previous_value = data_source[col_def.data_id]
+            changed = previous_value != value
             if changed:
                 data_source[col_def.data_id] = value
         else:
             raise Exception("Unhandled data source type")
 
         if changed:
-            self.log_extra_debug("Set managed data", index=index,
+            self.log_extra_debug("Set managed data", index="%i,%i" % (index.row(), index.column()),
                                                      data_id=col_def.data_id,
-                                                     column_no=col_def.column_no,
                                                      column=col_def.display_name,
-                                                     value=value)
+                                                     value=value,
+                                                     previous_value=previous_value)
 
-            self.dataChanged.emit(index, index)
+            self.setData(index, previous_value, ItemModelRoles.PreviousValue)
+            self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
 
     def data(self, index: QModelIndex, role=Qt.DisplayRole):
         if role in [Qt.DisplayRole, Qt.EditRole]:
             return self.get_data_set_column_value(index, role == Qt.DisplayRole)
+        elif role == ItemModelRoles.PreviousValue:
+            return self.get_previous_value(index)
         return None
 
     def setData(self, index: QModelIndex, value, role=Qt.EditRole):
-        if role != Qt.EditRole:
+        if role == ItemModelRoles.PreviousValue:
+            self.set_previous_value(index, value)
+        elif role == Qt.EditRole:
+            self.set_data_set_column_value(index, value)
+        else:
             raise Exception("Unhandled setData role")
-        self.set_data_set_column_value(index, value)
         return True
 
     def headerData(self, pos: int, orientation: int, role=Qt.DisplayRole):
@@ -267,6 +294,8 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
 
     def insertRows(self, pos, count, parent=None, *args, **kwargs):
         self.beginInsertRows(parent, pos, pos+count-1)
+        for i in range(pos, pos+count):
+            self.__reset_previous_values_for_row(i)
         self.insert_managed_rows(pos, count)
         self.endInsertRows()
         return True

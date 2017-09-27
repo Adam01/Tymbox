@@ -219,7 +219,7 @@ background-color: rgba(100,120,120,255);
        <enum>QTabWidget::North</enum>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <property name="usesScrollButtons">
        <bool>true</bool>
@@ -282,6 +282,16 @@ background-color: rgba(100,120,120,255);
                <string>Append Task</string>
               </property>
              </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnInterruptTask">
+              <property name="text">
+               <string>Interrupt Current Task</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="TymboxAssistantView" name="assistantView" native="true"/>
             </item>
             <item>
              <spacer name="verticalSpacer">
@@ -355,6 +365,13 @@ background-color: rgba(100,120,120,255);
               </property>
               <property name="maximum">
                <number>600</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="checkComeBack">
+              <property name="text">
+               <string>Come back to current task</string>
               </property>
              </widget>
             </item>
@@ -578,6 +595,14 @@ background-color: rgba(100, 255, 150, 255);
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>TymboxAssistantView</class>
+   <extends>QWidget</extends>
+   <header>Views/Tymbox/TymboxAssistantView</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
  <slots>

@@ -1,3 +1,5 @@
+from PyQt5.QtCore import Qt
+
 from PyQt5.QtCore import pyqtSlot, qDebug
 from PyQt5.QtWidgets import QMainWindow, QWidget, QDialog, QMessageBox
 
@@ -13,6 +15,8 @@ from Models.Trello.TrelloListsModel import TrelloListsModel
 from Views.Tymbox.TymboxTimeline import TymboxTimeline
 from Views.Generated.TymBox import Ui_MainWindow
 from Views.Generated.DebugTableView import Ui_DebugTableWindow
+from Views.Tymbox.TymboxTrayIcon import TymboxTrayIcon
+
 
 class MainWindow(QMainWindow):
     def __init__(self, trello_client: AsyncTrelloClient, parent=None):
@@ -37,6 +41,8 @@ class MainWindow(QMainWindow):
         self.tymbox_assistant = TymboxAssistant(self, self.tymbox_model)
         self.tymbox_assistant.setObjectName("TymboxAssistant")
         self.tymbox_assistant.set_log_level(LogLevel.Debug)
+
+        self.tray_icon = TymboxTrayIcon(self, self.tymbox_assistant.actions)
 
         self.tymbox_timeline = None
 
@@ -89,6 +95,8 @@ class MainWindow(QMainWindow):
         self.ui.btn_refresh_boards.released.connect(self.request_boards)
         self.ui.btn_refresh_lists.released.connect(self.request_lists)
 
+        self.ui.assistantView.set_assistant(self.tymbox_assistant)
+
     def request_boards(self):
         self.ui.cmb_boards.clear()
         self.ui.cmb_boards.setEditable(True)
@@ -114,11 +122,19 @@ class MainWindow(QMainWindow):
     def on_show_insert_task(self):
         self.ui.btnAddTask.setText("Insert")
         self.ui.stackedWidget.setCurrentIndex(1)
+        self.ui.checkComeBack.setVisible(False)
 
     @pyqtSlot(name="on_btnAppendTask_released")
     def on_show_append_task(self):
         self.ui.btnAddTask.setText("Append")
         self.ui.stackedWidget.setCurrentIndex(1)
+        self.ui.checkComeBack.setVisible(False)
+
+    @pyqtSlot(name="on_btnInterruptTask_released")
+    def on_show_interrupt_task(self):
+        self.ui.btnAddTask.setText("Interrupt")
+        self.ui.stackedWidget.setCurrentIndex(1)
+        self.ui.checkComeBack.setVisible(True)
 
     @pyqtSlot(name="on_btnAddTask_released")
     def on_add_task(self):
@@ -126,13 +142,17 @@ class MainWindow(QMainWindow):
             self.tymbox_model.append_task(self.ui.editTaskName.text(),
                                           self.ui.spinTaskDuration.value()*60)
         elif self.ui.btnAddTask.text() == "Insert":
-            # TODO
-            self.tymbox_model.append_task(self.ui.editTaskName.text(),
-                                          self.ui.spinTaskDuration.value()*60)
+            self.tymbox_model.insert_task_after_current(self.ui.editTaskName.text(),
+                                                        self.ui.spinTaskDuration.value()*60)
+        elif self.ui.btnAddTask.text() == "Interrupt":
+            self.tymbox_model.interrupt_current_task(self.ui.editTaskName.text(),
+                                                     self.ui.spinTaskDuration.value()*60,
+                                                     self.ui.checkComeBack.isChecked())
 
         self.ui.editTaskName.clear()
         self.ui.spinTaskDuration.setValue(15)
         self.ui.stackedWidget.setCurrentIndex(0)
+        self.ui.checkComeBack.setChecked(False)
 
     @pyqtSlot(name="on_btnAddTaskBack_released")
     def on_back_to_tasks(self):

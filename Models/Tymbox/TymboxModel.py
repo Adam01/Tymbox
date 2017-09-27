@@ -4,6 +4,8 @@ from enum import IntEnum, unique
 
 import math
 from PyQt5.QtCore import QModelIndex, Qt, QMimeData, QTextStream, QByteArray, QDataStream, QIODevice, pyqtSignal
+from PyQt5.QtWidgets import QActionGroup, QAction
+from copy import deepcopy
 
 from Models.ExtendableItemModel import ExtendableItemModel, ItemModelDataSetType, ItemModelDataSet
 from Models.Trello.TrelloCardsModel import TrelloCardsModel
@@ -114,8 +116,8 @@ class TymboxModel(ExtendableItemModel):
 
     def __init__(self, parent=None):
         ExtendableItemModel.__init__(self, parent)
-        self.duration = 8*60*60
-        self.start_time = datetime.datetime.today().replace(hour=12, minute=0, second=0, microsecond=0).timestamp()
+        self.duration = 16*60*60
+        self.start_time = datetime.datetime.today().replace(hour=8, minute=0, second=0, microsecond=0).timestamp()
         self.tasks = []
         self.cards_model = None
         self.next_task_to_insert = None
@@ -172,6 +174,13 @@ class TymboxModel(ExtendableItemModel):
         self.insertRow(at)
         self.next_task_to_insert = None
 
+    def get_current_task(self) -> (int, TymboxTask):
+        current_time = datetime.datetime.today().timestamp()
+        for i, task in enumerate(self.tasks):
+            if task.start_time <= current_time < task.end_time:
+                return i, task
+        return -1, None
+
     def append_task(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
         task = TymboxTask()
         task.name = name
@@ -180,6 +189,51 @@ class TymboxModel(ExtendableItemModel):
         task.time_preference = time_preference
         task.preference_value = task.start_time if preference_value is None else preference_value
         self.__insert_task(len(self.tasks), task)
+
+    def insert_task_after_current(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
+        current_row, current_task = self.get_current_task()
+
+        task = TymboxTask()
+        task.name = name
+        task.start_time = current_task.end_time if current_task is not None else self.start_time
+        task.end_time = task.start_time + duration
+        task.time_preference = time_preference
+        task.preference_value = task.start_time if preference_value is None else preference_value
+
+        self.__insert_task(current_row+1 if current_task is not None else self.rowCount(), task)
+
+
+    def interrupt_current_task(self, name, duration, come_back: bool, time_preference=TymboxTaskTimePreference.preferred, preference_value=None):
+        current_time = datetime.datetime.today().timestamp()
+
+        task = TymboxTask()
+        task.name = name
+        task.start_time = current_time
+        task.end_time = task.start_time + duration
+        task.time_preference = time_preference
+        task.preference_value = task.start_time if preference_value is None else preference_value
+
+
+        current_row, current_task = self.get_current_task()
+        insert_row = current_row + 1 if current_task is not None else self.rowCount()
+
+        if current_task is not None:
+            resumed_task = deepcopy(current_task) if come_back else None #type: TymboxEvent
+
+            self.setData(self.index(current_row, TymboxModelColumns.end_time), current_time)
+
+            self.__insert_task(insert_row, task)
+
+            self.log_extra_debug("Interrupt task", come_back=come_back, resumed=resumed_task, task=task, current_task=current_task)
+
+            if resumed_task is not None:
+                resumed_task.start_time = task.end_time
+                resumed_task.end_time += task.duration
+                self.__insert_task(insert_row + 1, resumed_task)
+        else:
+            self.__insert_task(insert_row, task)
+
+
 
     def remove_task(self, at):
         self.removeRow(at)

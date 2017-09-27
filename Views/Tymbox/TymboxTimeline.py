@@ -26,7 +26,7 @@ class TymboxTimeline(QWidget, LogHelper):
         self.tymbox_model = model
 
         self.zoom_level = 1
-        self.pixels_minute = 0
+        self.pixels_minute = 1
         self.padding = SimpleNamespace(left=80, top=10, right=10, bottom=10)
         self.timeline_axis_offset = 75
         self.hour_time_marker_axis_offset = -15
