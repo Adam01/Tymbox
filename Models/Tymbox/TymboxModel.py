@@ -181,38 +181,41 @@ class TymboxModel(ExtendableItemModel):
                 return i, task
         return -1, None
 
-    def append_task(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
+    def get_tasks_within(self, start_time: int, end_time: int) -> list:
+        tasks = list()
+        for i, task in enumerate(self.tasks):
+            if task.start_time >= start_time < task.end_time or task.start_time >= end_time < task.end_time:
+                tasks.append(task)
+        return tasks
+
+    def __create_task(self, name, start_time, end_time, time_preference, preference_value) -> TymboxTask:
         task = TymboxTask()
         task.name = name
-        task.start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
-        task.end_time = task.start_time + duration
+        task.start_time = start_time
+        task.end_time = end_time
         task.time_preference = time_preference
         task.preference_value = task.start_time if preference_value is None else preference_value
-        self.__insert_task(len(self.tasks), task)
+        return task
+
+    def insert_task(self, name: str, start_time: int, duration: int, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
+        if len(self.get_tasks_within(start_time, start_time+duration)):
+            return
+        self.__insert_task(len(self.tasks), self.__create_task(name, start_time, start_time+duration, time_preference, preference_value))
+
+    def append_task(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
+        start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
+        self.__insert_task(len(self.tasks), self.__create_task(name, start_time, start_time+duration, time_preference, preference_value))
 
     def insert_task_after_current(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
         current_row, current_task = self.get_current_task()
-
-        task = TymboxTask()
-        task.name = name
-        task.start_time = current_task.end_time if current_task is not None else self.start_time
-        task.end_time = task.start_time + duration
-        task.time_preference = time_preference
-        task.preference_value = task.start_time if preference_value is None else preference_value
-
-        self.__insert_task(current_row+1 if current_task is not None else self.rowCount(), task)
-
+        start_time = current_task.end_time if current_task is not None else self.start_time
+        row = current_row+1 if current_task is not None else self.rowCount()
+        self.__insert_task(row, self.__create_task(name, start_time, start_time + duration, time_preference,preference_value))
 
     def interrupt_current_task(self, name, duration, come_back: bool, time_preference=TymboxTaskTimePreference.preferred, preference_value=None):
         current_time = datetime.datetime.today().timestamp()
 
-        task = TymboxTask()
-        task.name = name
-        task.start_time = current_time
-        task.end_time = task.start_time + duration
-        task.time_preference = time_preference
-        task.preference_value = task.start_time if preference_value is None else preference_value
-
+        task = self.__create_task(name, current_time, current_time + duration, time_preference, preference_value)
 
         current_row, current_task = self.get_current_task()
         insert_row = current_row + 1 if current_task is not None else self.rowCount()
@@ -232,8 +235,6 @@ class TymboxModel(ExtendableItemModel):
                 self.__insert_task(insert_row + 1, resumed_task)
         else:
             self.__insert_task(insert_row, task)
-
-
 
     def remove_task(self, at):
         self.removeRow(at)

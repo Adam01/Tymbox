@@ -16,36 +16,15 @@ class TestTymboxModel(unittest.TestCase):
         model.set_log_level(LogLevel.ExtraDebug)
         model._register_columns()
 
-        midnight = datetime.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-        model.set_start_time(int(midnight))
-        model.set_duration(180)
+        midnight = int(datetime.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        model.set_start_time(midnight)
+        model.set_duration(3*60*60)
 
-        event = TymboxEvent()
-        event.name = "Test Task"
-
-        # These are sequential traits, handled from the sequential model
-        event.time_preference = TymboxTaskTimePreference.preferred
-        event.preference_value = midnight + 60*60*1
-
-        # Explicitly set schedules
-        event.start_time = midnight + 60*60*1
-        event.end_time   = midnight + 60*60*1 + 60*30
-
-        model.insert_task(0, event)
+        model.insert_task("Test Task", midnight + 60*60*1, 60*30, TymboxTaskTimePreference.preferred, midnight+60*60*1)
 
         self.assertEqual(1, model.rowCount())
 
-        event = TymboxEvent()
-        event.name = "Test Task 2"
-
-        # These are sequential traits, handled from the sequential model
-        event.time_preference = TymboxTaskTimePreference.preferred
-        event.preference_value = midnight + 60 * 60 * 2
-
-        # Explicitly set schedules
-        event.start_time = midnight + 60 * 60 * 2
-        event.end_time = midnight + 60 * 60 * 2 + 60 * 45
-        model.insert_task(1, event)
+        model.insert_task("Test Task 2", midnight + 60*60*2, 60 * 45, TymboxTaskTimePreference.preferred, midnight + 60 * 60 * 2)
 
         self.assertEqual(2, model.rowCount())
 
