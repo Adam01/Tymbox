@@ -33,8 +33,9 @@ def main():
     app = QApplication(sys.argv)
     trello_client = AsyncTrelloClient(TrelloConfig(), app)
     wnd = MainWindow(trello_client)
-    wnd.show()
-    sys.exit(app.exec_())
+    return_value = app.exec_()
+    wnd.on_exit()
+    sys.exit(return_value)
 
 if __name__ == '__main__':
     main()

@@ -64,14 +64,20 @@ class TymboxEvent(object):
     def deserialise(cls, data):
         instance = cls()
         instance.name = data["name"]
-        instance.end_time = data["duration"]
+        instance.end_time = data["end_time"]
+        instance.start_time = data["start_time"]
+        instance.time_preference = TymboxTaskTimePreference[data["time_preference"]]
+        instance.preference_value = data["preference_value"]
         return instance
 
     def serialise(self) -> dict():
         data = dict()
         data["type"] = self.type
         data["name"] = self.name
-        data["duration"] = self.duration
+        data["start_time"] = self.start_time
+        data["end_time"] = self.end_time
+        data["time_preference"] = self.time_preference.name
+        data["preference_value"] = self.preference_value
         return data
 
 
@@ -169,9 +175,9 @@ class TymboxModel(ExtendableItemModel):
 
         return default_flags
 
-    def __insert_task(self, at, task: TymboxEvent):
+    def __insert_task(self, task: TymboxEvent):
         self.next_task_to_insert = task
-        self.insertRow(at)
+        self.insertRow(self.get_insert_row_from_time(task.start_time))
         self.next_task_to_insert = None
 
     def get_current_task(self) -> (int, TymboxTask):
@@ -188,6 +194,12 @@ class TymboxModel(ExtendableItemModel):
                 tasks.append(task)
         return tasks
 
+    def get_insert_row_from_time(self, start_time: int) -> int:
+        for i, task in enumerate(self.tasks):
+            if task.start_time >= start_time:
+                return i
+        return len(self.tasks)
+
     def __create_task(self, name, start_time, end_time, time_preference, preference_value) -> TymboxTask:
         task = TymboxTask()
         task.name = name
@@ -200,17 +212,16 @@ class TymboxModel(ExtendableItemModel):
     def insert_task(self, name: str, start_time: int, duration: int, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
         if len(self.get_tasks_within(start_time, start_time+duration)):
             return
-        self.__insert_task(len(self.tasks), self.__create_task(name, start_time, start_time+duration, time_preference, preference_value))
+        self.__insert_task(self.__create_task(name, start_time, start_time+duration, time_preference, preference_value))
 
     def append_task(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
         start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
-        self.__insert_task(len(self.tasks), self.__create_task(name, start_time, start_time+duration, time_preference, preference_value))
+        self.__insert_task(self.__create_task(name, start_time, start_time+duration, time_preference, preference_value))
 
     def insert_task_after_current(self, name, duration, time_preference = TymboxTaskTimePreference.preferred, preference_value = None):
         current_row, current_task = self.get_current_task()
         start_time = current_task.end_time if current_task is not None else self.start_time
-        row = current_row+1 if current_task is not None else self.rowCount()
-        self.__insert_task(row, self.__create_task(name, start_time, start_time + duration, time_preference,preference_value))
+        self.__insert_task(self.__create_task(name, start_time, start_time + duration, time_preference,preference_value))
 
     def interrupt_current_task(self, name, duration, come_back: bool, time_preference=TymboxTaskTimePreference.preferred, preference_value=None):
         current_time = datetime.datetime.today().timestamp()
@@ -218,23 +229,47 @@ class TymboxModel(ExtendableItemModel):
         task = self.__create_task(name, current_time, current_time + duration, time_preference, preference_value)
 
         current_row, current_task = self.get_current_task()
-        insert_row = current_row + 1 if current_task is not None else self.rowCount()
 
         if current_task is not None:
             resumed_task = deepcopy(current_task) if come_back else None #type: TymboxEvent
 
             self.setData(self.index(current_row, TymboxModelColumns.end_time), current_time)
 
-            self.__insert_task(insert_row, task)
+            self.__insert_task(task)
 
             self.log_extra_debug("Interrupt task", come_back=come_back, resumed=resumed_task, task=task, current_task=current_task)
 
             if resumed_task is not None:
                 resumed_task.start_time = task.end_time
                 resumed_task.end_time += task.duration
-                self.__insert_task(insert_row + 1, resumed_task)
+                self.__insert_task(resumed_task)
         else:
-            self.__insert_task(insert_row, task)
+            self.__insert_task(task)
+
+    def export_tasks(self) -> list:
+        serialised_tasks = list()
+        start_of_day = datetime.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        for task in self.tasks:
+            exported_task = deepcopy(task) # type: TymboxTask
+            exported_task.start_time -= start_of_day
+            exported_task.end_time -= start_of_day
+            exported_task.preference_value -= start_of_day
+            serialised_tasks.append(exported_task.serialise())
+        return serialised_tasks
+
+    def import_tasks(self, tasks: list, replace=False):
+        if replace and self.rowCount() > 0:
+            self.removeRows(0, self.rowCount())
+
+        start_of_day = datetime.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+        for task in tasks:
+            imported_task = TymboxTaskFactory.deserialise(task)
+            if imported_task:
+                imported_task.start_time += start_of_day
+                imported_task.end_time += start_of_day
+                imported_task.preference_value += start_of_day
+                self.__insert_task(imported_task)
 
     def remove_task(self, at):
         self.removeRow(at)

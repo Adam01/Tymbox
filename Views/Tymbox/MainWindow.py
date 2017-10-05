@@ -1,7 +1,10 @@
+import json
+
+import os
 from PyQt5.QtCore import Qt
 
 from PyQt5.QtCore import pyqtSlot, qDebug
-from PyQt5.QtWidgets import QMainWindow, QWidget, QDialog, QMessageBox
+from PyQt5.QtWidgets import QMainWindow, QWidget, QDialog, QMessageBox, QFileDialog
 
 from Models.Tymbox.TymboxModel import TymboxTask
 from Trello.AsyncTrelloClient import AsyncTrelloClient, AsyncTrelloWrapper
@@ -70,6 +73,20 @@ class MainWindow(QMainWindow):
         self.ui.list_trello_cards.mouseMoveEvent = cardMouseEvent
         self.ui.list_trello_cards.leaveEvent = cardLeaveEvent
 
+        self.show()
+
+        file_name = os.path.join(os.getenv('LOCALAPPDATA'), "Tymbox", "model.json")
+        if self.import_model_from_file(file_name):
+            print("Loaded from %s" % file_name)
+        else:
+            print("Failed to load from %s" % file_name)
+
+    def on_exit(self):
+        file_name = os.path.join(os.getenv('LOCALAPPDATA'), "Tymbox", "model.json")
+        if self.export_model_to_file(file_name):
+            print("Saved to %s" % file_name)
+        else:
+            print("Failed to save to %s" % file_name)
 
     def retranslate_ui(self):
         self.ui.retranslateUi(self)
@@ -178,4 +195,41 @@ class MainWindow(QMainWindow):
         self.cards_model.set_list(AsyncTrelloWrapper(self.lists_model.get_list(self.ui.cmb_lists.currentIndex())))
         print("Selected list %s" % list_name)
 
+    @pyqtSlot(name="on_btnImport_released")
+    def on_import_tasks(self):
+        file_name = QFileDialog.getOpenFileName(self, "Import tasks")[0]
+        if self.import_model_from_file(file_name):
+            QMessageBox.information(self, "Success", "Imported tasks")
 
+    @pyqtSlot(name="on_btnExport_released")
+    def on_export_tasks(self):
+        file_name = QFileDialog.getSaveFileName(self, "Export tasks")[0]
+        if self.export_model_to_file(file_name):
+            QMessageBox.information(self, "Success", "Exported tasks")
+
+    def import_model_from_file(self, file_name) -> bool:
+        if file_name is not None and len(file_name):
+            try:
+                fp = open(file_name)
+                data = json.load(fp)
+                if data is not None:
+                    self.tymbox_model.import_tasks(data, True)
+                    return True
+            except:
+                pass
+        return False
+
+    def export_model_to_file(self, file_name):
+        if file_name is not None and len(file_name):
+            try:
+                dir_name = os.path.dirname(file_name)
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
+                fp = open(file_name, 'w')
+                data = self.tymbox_model.export_tasks()
+                json.dump(data, fp)
+                fp.close()
+                return True
+            except:
+                pass
+        return False
