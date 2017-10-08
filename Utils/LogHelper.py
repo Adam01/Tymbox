@@ -31,11 +31,17 @@ class LogHelper(object):
             self.__qobject_name = True
             self.objectNameChanged.connect(self.__on_qobject_name_changed)
             if self.objectName() is not None and len(self.objectName()):
-                self.__name = self.objectName()
+                self.__on_qobject_name_changed(self.objectName())
 
     def __on_qobject_name_changed(self, name: str):
         if self.__qobject_name:
-            self.__name = name
+            object_path = []
+            parent = self #type: QObject
+            while parent is not None:
+                object_path.append(parent.objectName())
+                parent = parent.parent()
+
+            self.__name = ":".join(object_path)
 
     def set_log_level(self, level: LogLevel):
         self.__level = level
@@ -74,6 +80,11 @@ class LogHelper(object):
                 str_args = [str(v) for v in args]
                 print(object_name, colored(" ".join(str_args), color=log_colour, attrs=log_attrs))
                 if len(kwargs):
-                    print("".join(["%s%s=%s\n"%("".rjust(len(self.__name)+4), colored(name, color="blue", attrs=["bold"]), colored(repr(value), color="white", attrs=[])) for name, value in kwargs.items()]))
+                    print("".join([ "%s%s=%s\n" % ("".rjust(len(self.__name)+4),
+                                                    colored(name, color="blue", attrs=["bold"]),
+                                                    colored(repr(value), color="white", attrs=[]))
+                                    for name, value in kwargs.items()]))
             elif len(kwargs):
-                print(object_name, ":", " ".join(["%s=%s\n"%(colored(name, color="blue", attrs=["bold"]), colored(repr(value), color="white", attrs=[])) for name, value in kwargs.items()]))
+                print(object_name, ":", " ".join(["%s=%s\n" % (colored(name, color="blue", attrs=["bold"]),
+                                                               colored(repr(value), color="white", attrs=[]))
+                                                  for name, value in kwargs.items()]))

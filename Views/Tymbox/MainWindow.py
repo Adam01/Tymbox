@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QMainWindow, QWidget, QDialog, QMessageBox, QFileDia
 
 from Models.Tymbox.TymboxModel import TymboxTask
 from Trello.AsyncTrelloClient import AsyncTrelloClient, AsyncTrelloWrapper
+from Trello.TrelloConfig import TrelloConfig
 from Utils.LogHelper import LogLevel
 from Models.Tymbox.SequentialTymboxModel import SequentialTymboxModel
 from Models.Trello.TrelloBoardsModel import TrelloBoardsModel
@@ -22,10 +23,10 @@ from Views.Tymbox.TymboxTrayIcon import TymboxTrayIcon
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, trello_client: AsyncTrelloClient, parent=None):
+    def __init__(self, parent=None):
         QWidget.__init__(self, parent)
         self.ui = Ui_MainWindow()
-        self.trello_client = trello_client
+        self.trello_client = AsyncTrelloClient(self)
 
         self.boards_model = TrelloBoardsModel(self.trello_client, self)
         self.boards_model.setObjectName("BoardsModel")
@@ -45,7 +46,7 @@ class MainWindow(QMainWindow):
         self.tymbox_assistant.setObjectName("TymboxAssistant")
         self.tymbox_assistant.set_log_level(LogLevel.Debug)
 
-        self.tray_icon = TymboxTrayIcon(self, self.tymbox_assistant.actions)
+        self.tray_icon = TymboxTrayIcon(self, dict(self.tymbox_assistant.action_map, **self.tymbox_model.action_map))
 
         self.tymbox_timeline = None
 
@@ -57,7 +58,7 @@ class MainWindow(QMainWindow):
         self.debug_table_view_ui.debugTableView.setModel(self.tymbox_model)
         self.debug_table_view.show()
 
-        self.request_boards()
+        self.trello_client.config_updated.connect(self.request_boards)
 
         default_card_mouse_event = self.ui.list_trello_cards.mouseMoveEvent
         default_card_leave_event = self.ui.list_trello_cards.leaveEvent
@@ -75,18 +76,32 @@ class MainWindow(QMainWindow):
 
         self.show()
 
-        file_name = os.path.join(os.getenv('LOCALAPPDATA'), "Tymbox", "model.json")
-        if self.import_model_from_file(file_name):
-            print("Loaded from %s" % file_name)
+        self.trello_config = None
+
+        self.app_dir_name = os.path.join(os.getenv('LOCALAPPDATA'), "Tymbox")
+        self.model_file_name = os.path.join(self.app_dir_name , "model.json")
+        self.trello_config_file = os.path.join(self.app_dir_name, "trello.json")
+
+
+        if self.import_model_from_file(self.model_file_name):
+            print("Loaded from %s" % self.model_file_name)
         else:
-            print("Failed to load from %s" % file_name)
+            print("Failed to load from %s" % self.model_file_name)
+
+        trello_config = TrelloConfig()
+        if trello_config.load_from_file(self.trello_config_file):
+            print("Loaded from %s" % self.trello_config_file)
+            self.trello_client.setup_from_config(trello_config)
+            self.ui.trello_stack.setCurrentIndex(0)
+        else:
+            print("Failed to load from %s" % self.trello_config_file)
+
 
     def on_exit(self):
-        file_name = os.path.join(os.getenv('LOCALAPPDATA'), "Tymbox", "model.json")
-        if self.export_model_to_file(file_name):
-            print("Saved to %s" % file_name)
+        if self.export_model_to_file(self.model_file_name):
+            print("Saved to %s" % self.model_file_name)
         else:
-            print("Failed to save to %s" % file_name)
+            print("Failed to save to %s" % self.model_file_name)
 
     def retranslate_ui(self):
         self.ui.retranslateUi(self)
@@ -233,3 +248,23 @@ class MainWindow(QMainWindow):
             except:
                 pass
         return False
+
+    @pyqtSlot(name="on_btn_request_trello_auth_released")
+    def on_request_trello_auth(self):
+        self.trello_config = TrelloConfig()
+        url = self.trello_config.request_oauth(self.ui.edit_trello_key.text(), self.ui.edit_trello_secret.text())
+
+        import webbrowser
+        webbrowser.open(url)
+
+    @pyqtSlot(str, name="on_edit_trello_verifier_textEdited")
+    def on_trello_verifier_edited(self, value):
+        if self.trello_config:
+            if self.trello_config.complete_oauth(value):
+                self.trello_client.setup_from_config(self.trello_config)
+                self.trello_config.save_to_file(self.trello_config_file)
+                self.trello_config = None
+                QMessageBox.information(self, "Success", "Trello authenticated")
+                self.ui.trello_stack.setCurrentIndex(0)
+            else:
+                QMessageBox.information(self, "Failed", "Trello PIN didn't seem to work...")

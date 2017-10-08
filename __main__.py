@@ -31,8 +31,7 @@ def main():
     # Doesn't play well with pycharm console
     # colorama.init()
     app = QApplication(sys.argv)
-    trello_client = AsyncTrelloClient(TrelloConfig(), app)
-    wnd = MainWindow(trello_client)
+    wnd = MainWindow()
     return_value = app.exec_()
     wnd.on_exit()
     sys.exit(return_value)

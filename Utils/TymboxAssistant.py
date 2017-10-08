@@ -14,13 +14,16 @@ class TymboxAssistant(QObject, LogHelper):
         QObject.__init__(self, parent)
         LogHelper.__init__(self)
         self.model = model
+
+        self.action_map = dict()
+
         self.current_task = None
         self.current_task_index = None
         self.task_end_timer = QTimer()
         self.task_end_timer.setSingleShot(True)
         self.task_end_timer.timeout.connect(self.__on_task_ended)
 
-        self._actions = QActionGroup(self)
+        current_task_actions = QActionGroup(self)
 
         self.end_current_task_action = QAction("End current task", self)
         self.end_current_task_action.setObjectName("EndCurrentTask")
@@ -30,7 +33,6 @@ class TymboxAssistant(QObject, LogHelper):
         self.current_task_name.setDisabled(True)
 
         self.remaining_time_action = QAction(self)
-        self.remaining_time_action.setVisible(True)
         self.remaining_time_action.setEnabled(False)
         self.remaining_time_action.setObjectName("RemainingTime")
 
@@ -40,12 +42,15 @@ class TymboxAssistant(QObject, LogHelper):
         self.remaining_time_update_timer.start()
         self.remaining_time_update_timer.timeout.connect(self.__on_update_remaining_time)
 
-        self._actions.addAction(self.current_task_name)
+        current_task_actions.addAction(self.current_task_name)
         sep = QAction(self)
         sep.setSeparator(True)
-        self._actions.addAction(sep)
-        self._actions.addAction(self.remaining_time_action)
-        self._actions.addAction(self.end_current_task_action)
+        current_task_actions.addAction(sep)
+        current_task_actions.addAction(self.remaining_time_action)
+        current_task_actions.addAction(self.end_current_task_action)
+        current_task_actions.setVisible(False)
+
+        self.action_map["Current Task"] = current_task_actions
 
         model.dataChanged.connect(self.on_model_data_changed)
         model.rowsInserted.connect(self.on_model_row_inserted, Qt.QueuedConnection)
@@ -59,9 +64,6 @@ class TymboxAssistant(QObject, LogHelper):
                                               second=int(remaining_s%60)).strftime('%H:%M:%S')
             self.remaining_time_action.setText("Remaining time: %s" % str(remaining_str))
 
-    @property
-    def actions(self) -> QActionGroup:
-        return self._actions
 
     def end_current_task(self):
         if self.current_task_index is not None:
@@ -82,14 +84,14 @@ class TymboxAssistant(QObject, LogHelper):
         self.current_task_name.setText(self.current_task.name)
         self.task_end_timer.start(remaining_s*1000)
         self.__on_update_remaining_time()
-        self._actions.setVisible(True)
+        self.action_map["Current Task"].setVisible(True)
 
     def __clear_current_task(self):
         self.current_task = None
         self.current_task_index = None
         self.task_end_timer.stop()
         self.current_task_name.setText("")
-        self._actions.setVisible(False)
+        self.action_map["Current Task"].setVisible(False)
         self.remaining_time_action.setText("")
 
     def __scan_rows(self, start: int, end: int):

@@ -3,12 +3,16 @@ import json
 from enum import IntEnum, unique
 
 import math
-from PyQt5.QtCore import QModelIndex, Qt, QMimeData, QTextStream, QByteArray, QDataStream, QIODevice, pyqtSignal
-from PyQt5.QtWidgets import QActionGroup, QAction
+from PyQt5.QtCore import QModelIndex, Qt, QMimeData, QTextStream, QByteArray, QDataStream, QIODevice, pyqtSignal, \
+    QObject
+from PyQt5.QtWidgets import QActionGroup, QAction, QWidgetAction, QLineEdit, QSpinBox, QCheckBox
 from copy import deepcopy
+
+from qtpy import QtWidgets
 
 from Models.ExtendableItemModel import ExtendableItemModel, ItemModelDataSetType, ItemModelDataSet
 from Models.Trello.TrelloCardsModel import TrelloCardsModel
+from Utils.LogHelper import LogHelper
 
 
 class TymboxTaskFactory(object):
@@ -127,6 +131,68 @@ class TymboxModel(ExtendableItemModel):
         self.tasks = []
         self.cards_model = None
         self.next_task_to_insert = None
+
+        self.action_map = dict()
+
+        class model_actions(LogHelper, QObject):
+            def __init__(self, model):
+                QObject.__init__(self, model)
+                self.setObjectName("Actions")
+                LogHelper.__init__(self)
+                self.task_name_edit = QLineEdit()
+                self.task_name_edit.setPlaceholderText("Task Name")
+
+                self.task_duration_spin = QSpinBox()
+                self.task_duration_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.PlusMinus)
+                self.task_duration_spin.setMaximum(600)
+                self.task_duration_spin.setValue(30)
+                self.task_duration_spin.setMinimum(15)
+                self.task_duration_spin.setSuffix(" minutes")
+                self.task_duration_spin.setPrefix("Duration: ")
+
+                self.task_come_back_checkbox = QCheckBox()
+                self.task_come_back_checkbox.setChecked(True)
+                self.task_come_back_checkbox.setText("Come back to current task")
+
+                self.model = model
+
+                add_task_group = QActionGroup(self)
+
+                task_name_action = QWidgetAction(self)
+
+                task_name_action.setDefaultWidget(self.task_name_edit)
+                add_task_group.addAction(task_name_action)
+
+                task_duration_action = QWidgetAction(self)
+                task_duration_action.setDefaultWidget(self.task_duration_spin)
+                add_task_group.addAction(task_duration_action)
+
+                task_come_back_action = QWidgetAction(self)
+                task_come_back_action.setDefaultWidget(self.task_come_back_checkbox)
+                add_task_group.addAction(task_come_back_action)
+
+                start_task_action = QAction("Start Task", self)
+                start_task_action.setObjectName("StartTask")
+                start_task_action.triggered.connect(self.on_start_task)
+                add_task_group.addAction(start_task_action)
+
+                self.model.action_map["Add Task"] = add_task_group
+
+            def on_start_task(self):
+                task_name = self.task_name_edit.text()
+                self.task_name_edit.setText("")
+                self.task_name_edit.clearFocus()
+
+                task_duration = self.task_duration_spin.value()*60
+                self.task_duration_spin.setValue(30)
+
+                come_back = self.task_come_back_checkbox.isChecked()
+                self.task_come_back_checkbox.setChecked(True)
+
+                self.log_debug("on_start_task", name=task_name, duration = task_duration, come_back = come_back)
+                self.model.interrupt_current_task(task_name, task_duration, come_back)
+
+        model_actions(self)
 
     def _register_columns(self):
         data_set = self.add_data_set("TymboxModelDS", self.tasks, ItemModelDataSetType.Obj, True)
@@ -393,11 +459,13 @@ class TymboxModel(ExtendableItemModel):
             # Append
 
             task.start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
+            task.end_time = task.start_time + 60 * 60
             task.preference_value = task.start_time
 
-            self.__insert_task(len(self.tasks), task)
+            self.__insert_task(task)
         else:
             task.start_time = self.tasks[row].start_time
+            task.end_time = task.start_time + 60 * 60
             task.preference_value = self.tasks[row].start_time
             self.tasks[row] = task
             self.dataChanged.emit(self.index(row, 0), self.index(row, TymboxModelColumnsCount))

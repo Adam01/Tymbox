@@ -32,12 +32,25 @@ class GenericMethodThread(QThread):
 
 # noinspection PyAbstractClass
 class AsyncTrelloClient(trello.TrelloClient, QObject):
-    def __init__(self, trello_config: TrelloConfig, parent=None):
+
+    config_updated = pyqtSignal()
+
+    def __init__(self, parent=None):
         QObject.__init__(self, parent)
-        self.client = trello.TrelloClient(**trello_config.client_config)
+        self.client = None
+
+    def load_from_file(self, config_file):
+        config = TrelloConfig()
+        if config.load_from_file(config_file):
+            self.setup_from_config(config)
+
+    def setup_from_config(self, config: TrelloConfig):
+        self.client = trello.TrelloClient(**config.client_config)
+        self.config_updated.emit()
 
     def __getattribute__(self, item):
-        attr = super(AsyncTrelloClient, self).__getattribute__("client").__getattribute__(item)
+        client_obj = super(AsyncTrelloClient, self).__getattribute__("client")
+        attr = client_obj.__getattribute__(item) if client_obj is not None else None
         if attr is not None:
             if callable(attr):
                 return GenericMethodThread(attr, self)
