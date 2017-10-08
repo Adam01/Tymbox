@@ -458,7 +458,16 @@ class TymboxModel(ExtendableItemModel):
         if row == -1 and column == -1:
             # Append
 
-            task.start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
+            start_time = self.tasks[-1].end_time if len(self.tasks) else self.start_time
+            start_time_data = mime_data.data("application/tymbox-start-time")
+            if start_time_data is not None:
+                start_time = QDataStream(start_time_data, QIODevice.ReadOnly).readInt()
+                self.log_debug("Using start time from mime", start_time=start_time)
+            else:
+                self.log_warning("No start time in mime")
+
+
+            task.start_time = start_time
             task.end_time = task.start_time + 60 * 60
             task.preference_value = task.start_time
 
@@ -475,7 +484,8 @@ class TymboxModel(ExtendableItemModel):
     def mimeData(self, index_list: list):
         mime_data = QMimeData()
 
-        """json_data = dict()
+
+        json_data = dict()
         json_data["dataType"] = "TymboxTasks"
         json_data["TymboxTasks"] = list()
         for index in index_list:
@@ -484,16 +494,17 @@ class TymboxModel(ExtendableItemModel):
                 json_data["TymboxTasks"].append(task.serialise())
 
         json_str = json.dumps(json_data)
-        print("Exporting MIME: %s" % json_str)
-        """
-        byte_array = QByteArray()
-        QDataStream(byte_array, QIODevice.WriteOnly).writeQVariantList([index.row() for index in index_list])
+        task_byte_array = QByteArray()
+        QDataStream(task_byte_array, QIODevice.WriteOnly).writeString(json_str)
+        mime_data.setData("application/tymbox-tasks-json", task_byte_array)
+        print("Exporting tasks MIME: %s" % json_str)
 
-        mime_data.setData("application/x-dnd-indices", byte_array)
-        print(str(byte_array))
+        index_byte_array = QByteArray()
+        QDataStream(index_byte_array, QIODevice.WriteOnly).writeQVariantList([index.row() for index in index_list])
+
+        mime_data.setData("application/x-dnd-indices", index_byte_array)
 
         print("Exported mime data with %i indices" % len(index_list))
-        print("outbound", index_list[0].row())
 
 
         return mime_data

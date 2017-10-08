@@ -4,7 +4,7 @@ import math
 from types import SimpleNamespace
 from typing import Union
 
-from PyQt5.QtCore import QTimer, QRect, Qt, QModelIndex, pyqtSlot
+from PyQt5.QtCore import QTimer, QRect, Qt, QModelIndex, pyqtSlot, QByteArray, QDataStream, QIODevice
 from PyQt5.QtGui import QPaintEvent, QPainter, QDropEvent, QDragEnterEvent, QDragMoveEvent, QDragLeaveEvent, \
     QMouseEvent, QPen, QColor, QShowEvent
 from PyQt5.QtWidgets import QWidget, QStyleOption, QStyleOptionViewItem, QSizePolicy
@@ -90,7 +90,7 @@ class TymboxTimeline(QWidget, LogHelper):
                                  y)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
-        print("drag enter")
+        self.log_debug("Drag enter")
         event.acceptProposedAction()
 
     def dragMoveEvent(self, event: QDragMoveEvent):
@@ -101,31 +101,28 @@ class TymboxTimeline(QWidget, LogHelper):
         pass
 
     def dragLeaveEvent(self, event: QDragLeaveEvent):
-        print("drag leave")
+        self.log_debug("Drag leave")
         event.accept()
+
+    def get_time_from_offset(self, y) -> int:
+        return self.tymbox_model.start_time + (y-self.padding.top)*self.pixels_minute*60
 
     def dropEvent(self, event: QDropEvent):
-        print("drop event")
+
+
+        time = self.get_time_from_offset(event.pos().y())
+        self.log_debug("Drop event", y=event.pos().y(), time=time)
+
         event.accept()
-        pos = event.pos()
-        print(pos.x(), pos.y())
-        option = QStyleOptionViewItem()
-        option.initFrom(self)
-        drop_index = QModelIndex()
-        for i in range(0, self.tymbox_model.rowCount()):
-            index = self.tymbox_model.index(i, 0)
-            size = self.task_delegate.sizeHint(option, index)
-            option.rect.setHeight(size.height())
-            option.rect.setWidth(self.width())
-            if option.rect.y() <= pos.y() <= (option.rect.y() + option.rect.height()):
-                print("found drop target")
-                drop_index = index
-                break
 
-            option.rect.adjust(0, size.height(), 0, 0)
+        mime_data = event.mimeData()
 
-        if self.tymbox_model.canDropMimeData(event.mimeData(), Qt.CopyAction, -1, -1, drop_index):
-            self.tymbox_model.dropMimeData(event.mimeData(), Qt.CopyAction, -1, -1, drop_index)
+        byte_array = QByteArray()
+        QDataStream(byte_array, QIODevice.WriteOnly).writeInt(time)
+        mime_data.setData("application/tymbox-start-time", byte_array)
+
+        if self.tymbox_model.canDropMimeData(mime_data, Qt.CopyAction, -1, -1, QModelIndex()):
+            self.tymbox_model.dropMimeData(mime_data, Qt.CopyAction, -1, -1, QModelIndex())
 
 
 
