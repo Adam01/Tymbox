@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt
 
 from Models.ExtendableItemModel import ItemModelDataSetType, ItemModelDataSet
 from Models.Tymbox.TymboxModel import TymboxModel, TymboxModelColumnsCount, TymboxModelColumns, \
-    TymboxTaskTimePreference, TymboxEvent
+    TymboxTaskTimePreference, TymboxTask
 
 
 class SequentialTiming(object):
@@ -73,7 +73,7 @@ class SequentialTymboxModel(TymboxModel):
             return self.start_time + self.duration
 
     # Aligning the model
-    def get_next_overlapping_event(self, row) -> (TymboxEvent, SequentialTiming):
+    def get_next_overlapping_event(self, row) -> (TymboxTask, SequentialTiming):
         if row+1 < len(self.tasks):
             event = self.get_event(row)
             next_event = self.get_event(row+1)
@@ -81,7 +81,7 @@ class SequentialTymboxModel(TymboxModel):
                 return next_event, self.timing_data[row+1]
         return None, None
 
-    def get_previous_overlapping_event(self, row: int) -> (TymboxEvent, SequentialTiming):
+    def get_previous_overlapping_event(self, row: int) -> (TymboxTask, SequentialTiming):
         if row > 0:
             event = self.get_event(row)
             previous_event = self.get_event(row-1)
@@ -103,8 +103,8 @@ class SequentialTymboxModel(TymboxModel):
             new_start_time = event.start_time + amount_s
             new_end_time = event.end_time + amount_s
 
-            self.setData(self.index(row, TymboxModelColumns.end_time), new_end_time, Qt.EditRole)
-            self.setData(self.index(row, TymboxModelColumns.start_time), new_start_time, Qt.EditRole)
+            event.set_end_time(new_end_time)
+            event.set_start_time(new_start_time)
 
             return new_start_time
 
@@ -118,7 +118,7 @@ class SequentialTymboxModel(TymboxModel):
             new_end_time = self.timing_data[row].latest_end
 
         if event.end_time != new_end_time:
-            self.setData(self.index(row, TymboxModelColumns.end_time), new_end_time)
+            event.set_end_time(new_end_time)
 
     def bring_to_preferred_start(self, row):
         """ Moves a task towards its preferred start time """

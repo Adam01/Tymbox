@@ -2,7 +2,7 @@ import datetime
 from PyQt5.QtCore import QObject, QModelIndex, Qt, pyqtSlot, pyqtSignal, QTimer, QPersistentModelIndex
 from PyQt5.QtWidgets import QActionGroup, QAction, QMenu
 
-from Models.Tymbox.TymboxModel import TymboxModel, TymboxTask, TymboxModelColumns, TymboxEvent
+from Models.Tymbox.TymboxModel import TymboxModel, TymboxTask, TymboxModelColumns, TymboxTask
 from Utils.LogHelper import LogHelper
 
 
@@ -74,7 +74,7 @@ class TymboxAssistant(QObject, LogHelper):
     def __on_task_ended(self):
         self.task_ended.emit(TymboxTask())
 
-    def __update_current_task(self, index: QModelIndex, task: TymboxEvent):
+    def __update_current_task(self, index: QModelIndex, task: TymboxTask):
         self.current_task = task
         self.current_task_index = QPersistentModelIndex(index) if task is not None else None
         current_time = datetime.datetime.today().timestamp()

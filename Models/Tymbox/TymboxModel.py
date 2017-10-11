@@ -6,7 +6,7 @@ import math
 from PyQt5.QtCore import QModelIndex, Qt, QMimeData, QTextStream, QByteArray, QDataStream, QIODevice, pyqtSignal, \
     QObject
 from PyQt5.QtWidgets import QActionGroup, QAction, QWidgetAction, QLineEdit, QSpinBox, QCheckBox
-from copy import deepcopy
+from copy import copy
 
 from qtpy import QtWidgets
 
@@ -49,21 +49,53 @@ class TymboxTaskTimePreference(IntEnum):
     duration        = preferred + 4     # Minimum duration, start asap
     fixed           = preferred + 5     # Cannot implicitly move
 
-
-class TymboxEvent(object):
-    type = "Event"
+@TymboxTaskFactory.register
+class TymboxTask(object):
+    type = "Task"
 
     def __init__(self):
+        self.model = None #type: TymboxModel
         self.end_time = 60
         self.name = ""
         self.start_time = 0
         self.preference_value = 0
         self.time_preference = TymboxTaskTimePreference.preferred
 
+    def set_data(self, col: int, value):
+        self.model.setData(self.column_index(col), value, Qt.EditRole)
+
+    # Model setters
+    def set_end_time(self, value: int):
+        self.set_data(TymboxModelColumns.end_time, value)
+
+    def set_start_time(self, value: int):
+        self.set_data(TymboxModelColumns.start_time, value)
+
+    def set_name(self, value: str):
+        self.set_data(TymboxModelColumns.name, value)
+
+    def set_time_preference(self, value: int):
+        self.set_data(TymboxModelColumns.time_preference, value)
+
+    def set_preference_value(self, value: int):
+        self.set_data(TymboxModelColumns.preference_value, value)
+
+    # Calculated properties
     @property
     def duration(self) -> int:
         return self.end_time - self.start_time
 
+    @property
+    def model_row(self):
+        return self.model.row_from_task(self)
+
+    def column_index(self, col: int = 0) -> QModelIndex:
+        return self.model.index_from_task(self, col)
+
+    def remove(self):
+        self.model.remove_task(self.model_row)
+
+    # Serialisation
     @classmethod
     def deserialise(cls, data):
         instance = cls()
@@ -83,11 +115,6 @@ class TymboxEvent(object):
         data["time_preference"] = self.time_preference.name
         data["preference_value"] = self.preference_value
         return data
-
-
-@TymboxTaskFactory.register
-class TymboxTask(TymboxEvent):
-    type = "Task"
 
 
 @TymboxTaskFactory.register
@@ -222,7 +249,7 @@ class TymboxModel(ExtendableItemModel):
     def set_cards_model(self, model: TrelloCardsModel):
         self.cards_model = model
 
-    def get_event(self, row: int) -> TymboxEvent:
+    def get_event(self, row: int) -> TymboxTask:
         return self.tasks[row]
 
     def supportedDropActions(self):
@@ -230,6 +257,18 @@ class TymboxModel(ExtendableItemModel):
 
     def supportedDragActions(self):
         return Qt.MoveAction
+
+    def row_from_task(self, task: TymboxTask):
+        for i, t in enumerate(self.tasks):
+            if t == task:
+                return i
+        return None
+
+    def index_from_task(self, task: TymboxTask, col: int = 0) -> QModelIndex:
+        row = self.row_from_task(task)
+        if row is not None:
+            return self.createIndex(row, col)
+        return QModelIndex()
 
     def flags(self, index: QModelIndex):
         default_flags = ExtendableItemModel.flags(self, index)
@@ -241,7 +280,7 @@ class TymboxModel(ExtendableItemModel):
 
         return default_flags
 
-    def __insert_task(self, task: TymboxEvent):
+    def __insert_task(self, task: TymboxTask):
         self.next_task_to_insert = task
         self.insertRow(self.get_insert_row_from_time(task.start_time))
         self.next_task_to_insert = None
@@ -297,9 +336,9 @@ class TymboxModel(ExtendableItemModel):
         current_row, current_task = self.get_current_task()
 
         if current_task is not None:
-            resumed_task = deepcopy(current_task) if come_back else None #type: TymboxEvent
+            resumed_task = copy(current_task) if come_back else None #type: TymboxTask
 
-            self.setData(self.index(current_row, TymboxModelColumns.end_time), current_time)
+            current_task.set_end_time(current_time)
 
             self.__insert_task(task)
 
@@ -316,7 +355,7 @@ class TymboxModel(ExtendableItemModel):
         serialised_tasks = list()
         start_of_day = datetime.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
         for task in self.tasks:
-            exported_task = deepcopy(task) # type: TymboxTask
+            exported_task = copy(task) # type: TymboxTask
             exported_task.start_time -= start_of_day
             exported_task.end_time -= start_of_day
             exported_task.preference_value -= start_of_day
@@ -336,6 +375,8 @@ class TymboxModel(ExtendableItemModel):
                 imported_task.end_time += start_of_day
                 imported_task.preference_value += start_of_day
                 self.__insert_task(imported_task)
+            else:
+                self.log_error("Failed to import task", task)
 
     def remove_task(self, at):
         self.removeRow(at)
@@ -344,10 +385,12 @@ class TymboxModel(ExtendableItemModel):
         if data_set.id == "TymboxModelDS":
             if self.next_task_to_insert is None:
                 print("construct called for task")
-                return TymboxEvent()
+                task = TymboxTask()
             else:
                 print("construct called for inserted task")
-                return self.next_task_to_insert
+                task = self.next_task_to_insert
+            task.model = self
+            return task
         return ExtendableItemModel.construct_data_source(self, data_set, pos)
 
     def mimeTypes(self):
@@ -384,7 +427,7 @@ class TymboxModel(ExtendableItemModel):
             task = self.get_event(from_row)
             print("Moving task %s" % task.name)
 
-            self.tasks[from_row] = TymboxEvent()
+            self.tasks[from_row] = TymboxTask()
             self.dataChanged.emit(self.index(from_row, 0), self.index(from_row, 1))
 
         elif action == Qt.CopyAction:

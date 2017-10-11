@@ -71,6 +71,13 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
         self.previous_values[row] = dict()
 
     def set_previous_value(self, index: QModelIndex, value):
+        if index.row() not in self.previous_values:
+            self.log_warning("Missing row for previous values",
+                             row=index.row(),
+                             column=index.column(),
+                             value=repr(value))
+            self.__reset_previous_values_for_row(index.row())
+
         self.previous_values[index.row()][index.column()] = value
         self.dataChanged.emit(index, index, [ItemModelRoles.PreviousValue])
 

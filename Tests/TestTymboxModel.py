@@ -2,7 +2,7 @@ import datetime
 import unittest
 from PyQt5.QtCore import Qt
 
-from Models.Tymbox.TymboxModel import TymboxModel, TymboxEvent, TymboxTaskTimePreference, TymboxModelColumns
+from Models.Tymbox.TymboxModel import TymboxModel, TymboxTask, TymboxTaskTimePreference, TymboxModelColumns
 from Utils.LogHelper import LogLevel
 
 
