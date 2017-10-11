@@ -6,7 +6,7 @@ from typing import Union
 
 from PyQt5.QtCore import QTimer, QRect, Qt, QModelIndex, pyqtSlot, QByteArray, QDataStream, QIODevice
 from PyQt5.QtGui import QPaintEvent, QPainter, QDropEvent, QDragEnterEvent, QDragMoveEvent, QDragLeaveEvent, \
-    QMouseEvent, QPen, QColor, QShowEvent
+    QMouseEvent, QPen, QColor, QShowEvent, QBrush
 from PyQt5.QtWidgets import QWidget, QStyleOption, QStyleOptionViewItem, QSizePolicy
 
 from Models.Tymbox.SequentialTymboxModel import SequentialTymboxModel
@@ -33,6 +33,8 @@ class TymboxTimeline(QWidget, LogHelper):
         self.time_marker_axis_offset = -5
         self.hour_text_axis_offset = -55
         self.item_spacing = 2
+
+        self.drop_y = None
 
         self.tymbox_model.rowsInserted.connect(self.on_rowsInserted)
         self.tymbox_model.durationChanged.connect(self.update_height)
@@ -62,6 +64,15 @@ class TymboxTimeline(QWidget, LogHelper):
 
         self.draw_current_time_indicator(option, painter)
         self.draw_timeline_axis(option, painter)
+        self.draw_drop_zone(painter)
+
+    def draw_drop_zone(self, painter: QPainter):
+        if self.drop_y is not None:
+            painter.fillRect(self.timeline_axis_offset,
+                             self.drop_y,
+                             self.width(),
+                             self.pixels_minute*60,
+                             QBrush(QColor(128,128,128,128)))
 
     def draw_current_time_indicator(self, option: QStyleOptionViewItem, painter: QPainter):
         start_time = self.tymbox_model.start_time
@@ -71,7 +82,7 @@ class TymboxTimeline(QWidget, LogHelper):
         pen = painter.pen()
         pen.setColor(Qt.red)
         painter.setPen(pen)
-        painter.drawLine(60, completion_y, self.width(), completion_y)
+        painter.drawLine(0, completion_y, self.width(), completion_y)
 
     def draw_timeline_axis(self, option: QStyleOptionViewItem, painter: QPainter):
         pen = painter.pen()
@@ -89,13 +100,23 @@ class TymboxTimeline(QWidget, LogHelper):
                 painter.drawLine(self.timeline_axis_offset + self.time_marker_axis_offset, y, self.timeline_axis_offset,
                                  y)
 
+    def update_drop_zone(self, y):
+        self.drop_y = self.snap_to_15mins(y)
+        self.repaint()
+
+    def clear_drop_zone(self):
+        self.drop_y = None
+        self.repaint()
+
     def dragEnterEvent(self, event: QDragEnterEvent):
         self.log_debug("Drag enter")
         event.acceptProposedAction()
+        self.update_drop_zone(event.pos().y())
 
     def dragMoveEvent(self, event: QDragMoveEvent):
         # print("drag move")
         event.acceptProposedAction()
+        self.update_drop_zone(event.pos().y())
 
     def setDragEnabled(self, enabled: bool):
         pass
@@ -103,12 +124,16 @@ class TymboxTimeline(QWidget, LogHelper):
     def dragLeaveEvent(self, event: QDragLeaveEvent):
         self.log_debug("Drag leave")
         event.accept()
+        self.clear_drop_zone()
+
+    def snap_to_15mins(self, y) -> int:
+        return y - (y-self.padding.top) % (self.pixels_minute*15)
 
     def get_time_from_offset(self, y) -> int:
-        return self.tymbox_model.start_time + (y-self.padding.top)*self.pixels_minute*60
+        return self.tymbox_model.start_time + (self.snap_to_15mins(y)-self.padding.top) * self.pixels_minute*60
 
     def dropEvent(self, event: QDropEvent):
-
+        self.clear_drop_zone()
 
         time = self.get_time_from_offset(event.pos().y())
         self.log_debug("Drop event", y=event.pos().y(), time=time)
