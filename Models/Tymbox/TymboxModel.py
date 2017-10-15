@@ -5,15 +5,18 @@ from enum import IntEnum, unique
 import math
 from PyQt5.QtCore import QModelIndex, Qt, QMimeData, QTextStream, QByteArray, QDataStream, QIODevice, pyqtSignal, \
     QObject
-from PyQt5.QtWidgets import QActionGroup, QAction, QWidgetAction, QLineEdit, QSpinBox, QCheckBox
 from copy import copy
 
-from qtpy import QtWidgets
 
 from Models.ExtendableItemModel import ExtendableItemModel, ItemModelDataSetType, ItemModelDataSet
 from Models.Trello.TrelloCardsModel import TrelloCardsModel
-from Utils.LogHelper import LogHelper
 
+
+def time_formatter(i: float):
+    return datetime.datetime.fromtimestamp(i).strftime('%H:%M:%S')
+
+def duration_formatter(i: int):
+    return datetime.time(hour=int(math.floor(i / 60)), minute=i % 60).strftime('%H:%M:%S')
 
 class TymboxTaskFactory(object):
     classes = list()
@@ -95,6 +98,9 @@ class TymboxTask(object):
     def remove(self):
         self.model.remove_task(self.model_row)
 
+    def __repr__(self):
+        return "%s(%s->%s)" % (self.name, time_formatter(self.start_time), time_formatter(self.end_time))
+
     # Serialisation
     @classmethod
     def deserialise(cls, data):
@@ -151,91 +157,20 @@ class TymboxModel(ExtendableItemModel):
 
     durationChanged = pyqtSignal(int)
 
-    def __init__(self, parent=None):
-        ExtendableItemModel.__init__(self, parent)
+    def __init__(self, parent=None, name: str ="TymboxModel"):
+        ExtendableItemModel.__init__(self, parent, name)
         self.duration = 16*60*60
         self.start_time = datetime.datetime.today().replace(hour=8, minute=0, second=0, microsecond=0).timestamp()
         self.tasks = []
         self.cards_model = None
         self.next_task_to_insert = None
 
-        self.action_map = dict()
-
-        class model_actions(LogHelper, QObject):
-            def __init__(self, model):
-                QObject.__init__(self, model)
-                self.setObjectName("Actions")
-                LogHelper.__init__(self)
-                self.task_name_edit = QLineEdit()
-                self.task_name_edit.setPlaceholderText("Task Name")
-
-                self.task_duration_spin = QSpinBox()
-                self.task_duration_spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.PlusMinus)
-                self.task_duration_spin.setMaximum(600)
-                self.task_duration_spin.setValue(30)
-                self.task_duration_spin.setMinimum(15)
-                self.task_duration_spin.setSuffix(" minutes")
-                self.task_duration_spin.setPrefix("Duration: ")
-
-                self.task_come_back_checkbox = QCheckBox()
-                self.task_come_back_checkbox.setChecked(True)
-                self.task_come_back_checkbox.setText("Come back to current task")
-
-                self.model = model
-
-                add_task_group = QActionGroup(self)
-
-                task_name_action = QWidgetAction(self)
-
-                task_name_action.setDefaultWidget(self.task_name_edit)
-                add_task_group.addAction(task_name_action)
-
-                task_duration_action = QWidgetAction(self)
-                task_duration_action.setDefaultWidget(self.task_duration_spin)
-                add_task_group.addAction(task_duration_action)
-
-                task_come_back_action = QWidgetAction(self)
-                task_come_back_action.setDefaultWidget(self.task_come_back_checkbox)
-                add_task_group.addAction(task_come_back_action)
-
-                start_task_action = QAction("Start Task", self)
-                start_task_action.setObjectName("StartTask")
-                start_task_action.triggered.connect(self.on_start_task)
-                add_task_group.addAction(start_task_action)
-
-                self.model.action_map["Add Task"] = add_task_group
-
-            def on_start_task(self):
-                task_name = self.task_name_edit.text()
-                self.task_name_edit.setText("")
-                self.task_name_edit.clearFocus()
-
-                task_duration = self.task_duration_spin.value()*60
-                self.task_duration_spin.setValue(30)
-
-                come_back = self.task_come_back_checkbox.isChecked()
-                self.task_come_back_checkbox.setChecked(True)
-
-                self.log_debug("on_start_task", name=task_name, duration = task_duration, come_back = come_back)
-                self.model.interrupt_current_task(task_name, task_duration, come_back)
-
-        model_actions(self)
-
-    def _register_columns(self):
         data_set = self.add_data_set("TymboxModelDS", self.tasks, ItemModelDataSetType.Obj, True)
         self.add_columns(TymboxModelColumns, data_set)
 
-        self.set_column_formatter(TymboxModelColumns.start_time, self._time_formatter )
-        self.set_column_formatter(TymboxModelColumns.end_time, self._time_formatter )
-        self.set_column_formatter(TymboxModelColumns.preference_value, self._time_formatter )
-
-    @staticmethod
-    def _time_formatter(i: float):
-        return datetime.datetime.fromtimestamp(i).strftime('%H:%M:%S')
-
-    @staticmethod
-    def _duration_formatter(i: int):
-        return datetime.time(hour=int(math.floor(i/60)), minute=i%60).strftime('%H:%M:%S')
+        self.set_column_formatter(TymboxModelColumns.start_time, time_formatter)
+        self.set_column_formatter(TymboxModelColumns.end_time, time_formatter)
+        self.set_column_formatter(TymboxModelColumns.preference_value, time_formatter)
 
     def set_start_time(self, start_time: int):
         self.start_time = start_time

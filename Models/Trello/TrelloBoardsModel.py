@@ -8,6 +8,7 @@ from Utils.LogHelper import LogHelper
 class TrelloBoardsModel(QAbstractTableModel, LogHelper):
     def __init__(self, trello_client: AsyncTrelloClient, parent=None):
         QAbstractTableModel.__init__(self, parent)
+        LogHelper.__init__(self, "TrelloBoardsModel")
         self.trello_client = trello_client
         self.trello_boards = []
 

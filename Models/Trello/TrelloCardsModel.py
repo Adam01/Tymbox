@@ -34,7 +34,7 @@ class TrelloCardsModelColumns(IntEnum):
 
 class TrelloCardsModel(ExtendableItemModel):
     def __init__(self, parent: QObject = None):
-        ExtendableItemModel.__init__(self, parent)
+        ExtendableItemModel.__init__(self, parent, "TrelloCardsModel")
         self.trello_cards = []
         self.trello_board = None
         self.list = None

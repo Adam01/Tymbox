@@ -19,7 +19,7 @@ class TymboxTimeline(QWidget, LogHelper):
 
     def __init__(self, parent, model: SequentialTymboxModel):
         QWidget.__init__(self, parent)
-        LogHelper.__init__(self)
+        LogHelper.__init__(self, "TymboxTimeline")
 
         self.setFixedHeight(1000)
         self.setFixedWidth(100)

@@ -1,6 +1,7 @@
 import datetime
 from PyQt5.QtCore import QObject, QModelIndex, Qt, pyqtSlot, pyqtSignal, QTimer, QPersistentModelIndex
-from PyQt5.QtWidgets import QActionGroup, QAction, QMenu
+from PyQt5.QtWidgets import QActionGroup, QAction, QMenu, QWidgetAction, QCheckBox, QSpinBox, QLineEdit, \
+    QAbstractSpinBox
 
 from Models.Tymbox.TymboxModel import TymboxModel, TymboxTask, TymboxModelColumns, TymboxTask
 from Utils.LogHelper import LogHelper
@@ -12,7 +13,7 @@ class TymboxAssistant(QObject, LogHelper):
 
     def __init__(self, parent: QObject, model: TymboxModel):
         QObject.__init__(self, parent)
-        LogHelper.__init__(self)
+        LogHelper.__init__(self, "TymboxAssistant")
         self.model = model
 
         self.action_map = dict()
@@ -52,6 +53,44 @@ class TymboxAssistant(QObject, LogHelper):
 
         self.action_map["Current Task"] = current_task_actions
 
+        self.task_name_edit = QLineEdit()
+        self.task_name_edit.setPlaceholderText("Task Name")
+
+        self.task_duration_spin = QSpinBox()
+        self.task_duration_spin.setButtonSymbols(QAbstractSpinBox.PlusMinus)
+        self.task_duration_spin.setMaximum(600)
+        self.task_duration_spin.setValue(30)
+        self.task_duration_spin.setMinimum(15)
+        self.task_duration_spin.setSuffix(" minutes")
+        self.task_duration_spin.setPrefix("Duration: ")
+
+        self.task_come_back_checkbox = QCheckBox()
+        self.task_come_back_checkbox.setChecked(True)
+        self.task_come_back_checkbox.setText("Come back to current task")
+
+        add_task_group = QActionGroup(self)
+
+        task_name_action = QWidgetAction(self)
+
+        task_name_action.setDefaultWidget(self.task_name_edit)
+        add_task_group.addAction(task_name_action)
+
+        task_duration_action = QWidgetAction(self)
+        task_duration_action.setDefaultWidget(self.task_duration_spin)
+        add_task_group.addAction(task_duration_action)
+
+        task_come_back_action = QWidgetAction(self)
+        task_come_back_action.setDefaultWidget(self.task_come_back_checkbox)
+        add_task_group.addAction(task_come_back_action)
+
+        start_task_action = QAction("Start Task", self)
+        start_task_action.setObjectName("StartTask")
+        start_task_action.triggered.connect(self.__on_start_task)
+        add_task_group.addAction(start_task_action)
+
+        self.action_map["Add Task"] = add_task_group
+
+
         model.dataChanged.connect(self.on_model_data_changed)
         model.rowsInserted.connect(self.on_model_row_inserted, Qt.QueuedConnection)
 
@@ -71,8 +110,25 @@ class TymboxAssistant(QObject, LogHelper):
             self.model.setData(self.current_task_index.sibling(self.current_task_index.row(), TymboxModelColumns.end_time), current_time)
             self.log_info("Ended current task")
 
+    def __on_start_task(self):
+        task_name = self.task_name_edit.text()
+        self.task_name_edit.setText("")
+        self.task_name_edit.clearFocus()
+
+        task_duration = self.task_duration_spin.value() * 60
+        self.task_duration_spin.setValue(30)
+
+        come_back = self.task_come_back_checkbox.isChecked()
+        self.task_come_back_checkbox.setChecked(True)
+
+        self.log_debug("on_start_task", name=task_name, duration=task_duration, come_back=come_back)
+        self.model.interrupt_current_task(task_name, task_duration, come_back)
+
     def __on_task_ended(self):
-        self.task_ended.emit(TymboxTask())
+        self.log_debug("Task ended", current_task=self.current_task)
+        if self.current_task is not None:
+            self.task_ended.emit(self.current_task)
+            self.__clear_current_task()
 
     def __update_current_task(self, index: QModelIndex, task: TymboxTask):
         self.current_task = task

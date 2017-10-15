@@ -9,7 +9,7 @@ from Views.Generated.TymboxAssistantView import Ui_TymboxAssistantView
 class TymboxAssistantView(QWidget, LogHelper):
     def __init__(self, parent: QWidget):
         QWidget.__init__(self, parent)
-        LogHelper.__init__(self)
+        LogHelper.__init__(self, "TymboxAssistantView")
         self.ui = Ui_TymboxAssistantView()
         self.ui.setupUi(self)
         self.assistant = None # type: TymboxAssistant

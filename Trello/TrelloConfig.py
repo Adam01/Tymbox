@@ -8,7 +8,7 @@ from Utils.LogHelper import LogHelper
 
 class TrelloConfig(LogHelper):
     def __init__(self):
-        LogHelper.__init__(self)
+        LogHelper.__init__(self, "TrelloConfig")
 
         self.data = dict(api_key="",
                         api_secret="",

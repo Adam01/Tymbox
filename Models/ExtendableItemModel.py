@@ -60,11 +60,11 @@ class ExtendableItemModel(QAbstractItemModel, LogHelper):
         sets when rows are added and removing items from those sets when rows are removed.
 
     """
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, name: str = "ExtendableItemModel"):
         QAbstractItemModel.__init__(self, parent)
+        LogHelper.__init__(self, name)
         self.column_definitions = dict()
         self.data_sets = list()
-        self.log_extra_debug("Initialised")
         self.previous_values = dict()
 
     def __reset_previous_values_for_row(self, row):

@@ -6,7 +6,7 @@ from PyQt5.QtCore import Qt
 
 from Models.ExtendableItemModel import ItemModelDataSetType, ItemModelDataSet
 from Models.Tymbox.TymboxModel import TymboxModel, TymboxModelColumnsCount, TymboxModelColumns, \
-    TymboxTaskTimePreference, TymboxTask
+    TymboxTaskTimePreference, TymboxTask, time_formatter
 
 
 class SequentialTiming(object):
@@ -20,27 +20,19 @@ class SequentialTymboxModelColumns(IntEnum):
     latest_end      = earliest_start + 1
 
 class SequentialTymboxModel(TymboxModel):
-    def __init__(self, parent=None):
-        TymboxModel.__init__(self, parent)
-        self.setObjectName("SequentialTymboxModel")
+    def __init__(self, parent=None, name: str = "SequentialTymboxModel"):
+        TymboxModel.__init__(self, parent, name)
         self.timing_data = []
 
         self.dataChanged.connect(self.on_dataChanged)
         self.rowsInserted.connect(self.on_rowInserted)
         self.rowsRemoved.connect(self.on_rowRemoved)
 
-        # Figure this design flaw out later
-        # Goal is to have the object name for the model set before it logs column additions
-        self._register_columns()
-
-    def _register_columns(self):
-        TymboxModel._register_columns(self)
-
         data_set = self.add_data_set("SequentialModelDS", self.timing_data, ItemModelDataSetType.Obj, True)
         self.add_columns(SequentialTymboxModelColumns, data_set)
 
-        self.set_column_formatter(SequentialTymboxModelColumns.earliest_start, self._time_formatter)
-        self.set_column_formatter(SequentialTymboxModelColumns.latest_end, self._time_formatter)
+        self.set_column_formatter(SequentialTymboxModelColumns.earliest_start, time_formatter)
+        self.set_column_formatter(SequentialTymboxModelColumns.latest_end, time_formatter)
 
     # Pre-calculations
     def calculate_earliest_start(self, pos) -> int:

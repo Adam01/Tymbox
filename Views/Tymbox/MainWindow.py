@@ -46,7 +46,7 @@ class MainWindow(QMainWindow):
         self.tymbox_assistant.setObjectName("TymboxAssistant")
         self.tymbox_assistant.set_log_level(LogLevel.Debug)
 
-        self.tray_icon = TymboxTrayIcon(self, dict(self.tymbox_assistant.action_map, **self.tymbox_model.action_map))
+        self.tray_icon = TymboxTrayIcon(self, self.tymbox_assistant)
 
         self.tymbox_timeline = None
 

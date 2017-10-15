@@ -11,8 +11,8 @@ from Views.Generated.TymBoxTaskView import Ui_TymboxTaskView
 class DragHelper(LogHelper):
     mouse_dragged = pyqtSignal(QModelIndex, int, name="mouseDragged")
 
-    def __init__(self, widget, parent, cursor: QCursor, handler: callable, hot_spot: callable):
-        LogHelper.__init__(self)
+    def __init__(self, widget, parent, cursor: QCursor, handler: callable, hot_spot: callable, name="DragHelper"):
+        LogHelper.__init__(self, name)
         self.drag_last_pos = None
         self.widget = widget
         self.parent = parent
@@ -80,7 +80,7 @@ class DragHelper(LogHelper):
 class TymboxTaskView(QWidget, LogHelper):
     def __init__(self, parent, index: QModelIndex):
         QWidget.__init__(self, parent)
-        LogHelper.__init__(self)
+        LogHelper.__init__(self, "TymboxTaskView(?)")
         self.set_log_level(LogLevel.Debug)
         self.ui = Ui_TymboxTaskView()
         self.setup_ui()

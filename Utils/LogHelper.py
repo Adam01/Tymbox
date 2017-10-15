@@ -22,26 +22,20 @@ class LogColour(Enum):
     ExtraDebug  = (None,    ["dark"])
 
 class LogHelper(object):
-    def __init__(self):
+    def __init__(self, name=None):
         self.__level = LogLevel.ExtraDebug
-        self.__name = repr(self)
+        self.__name = repr(self) if name is None else name
         self.__qobject_name = False
 
         if isinstance(self, QObject):
-            self.__qobject_name = True
-            self.objectNameChanged.connect(self.__on_qobject_name_changed)
-            if self.objectName() is not None and len(self.objectName()):
-                self.__on_qobject_name_changed(self.objectName())
+            if name is not None:
+                self.__qobject_name = True
+                self.objectNameChanged.connect(self.__on_qobject_name_changed)
+
 
     def __on_qobject_name_changed(self, name: str):
         if self.__qobject_name:
-            object_path = []
-            parent = self #type: QObject
-            while parent is not None:
-                object_path.append(parent.objectName())
-                parent = parent.parent()
-
-            self.__name = ":".join(object_path)
+            self.__name = self.objectName()
 
     def set_log_level(self, level: LogLevel):
         self.__level = level
@@ -71,16 +65,33 @@ class LogHelper(object):
     def log_extra_debug(self, *args, **kwargs):
         self.log_msg(LogLevel.ExtraDebug, *args, **kwargs)
 
+    def get_qobject_path_prefix(self):
+        if isinstance(self, QObject):
+            object_path = []
+            parent = self.parent() # type: QObject
+            while parent is not None:
+                if isinstance(parent, LogHelper):
+                    object_path.insert(0, parent.__name)
+                else:
+                    object_path.insert(0, parent.objectName())
+                parent = parent.parent()
+
+            if len(object_path) > 0:
+                return ":".join(object_path) + ":"
+        return ""
+
     def log_msg(self, level: LogLevel, *args, **kwargs):
         # TODO integrate with python logging
         if self.__level >= level:
             log_colour, log_attrs = LogColour.__dict__["_member_map_"][level.name].value
-            object_name = colored(self.__name, color="blue", attrs=["bold"])
+            object_prefix = self.get_qobject_path_prefix()
+            name_length = len(object_prefix) + len(self.__name) + 4
+            object_name = object_prefix + colored(self.__name, color="blue", attrs=["bold"])
             if len(args):
                 str_args = [str(v) for v in args]
                 print(object_name, colored(" ".join(str_args), color=log_colour, attrs=log_attrs))
                 if len(kwargs):
-                    print("".join([ "%s%s=%s\n" % ("".rjust(len(self.__name)+4),
+                    print("".join([ "%s%s=%s\n" % ("".rjust(name_length),
                                                     colored(name, color="blue", attrs=["bold"]),
                                                     colored(repr(value), color="white", attrs=[]))
                                     for name, value in kwargs.items()]))
